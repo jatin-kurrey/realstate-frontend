@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { Property, Requirement } from '../types/types';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5002/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5002';
+const API_URL = `${API_BASE_URL}/api`;
 export { API_URL };
 
 const api = axios.create({
