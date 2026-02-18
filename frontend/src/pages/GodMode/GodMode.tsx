@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
-import { adminService } from '@/services/api';
-import { Power, Shield, Lock, Activity, Server, AlertTriangle } from 'lucide-react';
+import api from '@/services/api';
+import { Power, Shield, Activity, Server, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const GodMode: React.FC = () => {
@@ -34,14 +34,22 @@ const GodMode: React.FC = () => {
         const newMode = systemStatus === 'ONLINE' ? 'true' : 'false';
         setLoading(true);
         try {
-            // Force update configuration bypassing normal checks if possible
-            // We use the existing updateConfig but ensuring it sets maintenance_mode
-            await adminService.updateConfig({ ...config, maintenance_mode: newMode });
+            // Use the dedicated GOD route which bypasses admin auth middleware
+            // and instead validates the GOD Header Key
+            await api.put('/god/config',
+                { ...config, maintenance_mode: newMode },
+                {
+                    headers: {
+                        'X-God-Key': GOD_key
+                    }
+                }
+            );
+
             await refreshConfig();
             setSystemStatus(newMode === 'true' ? 'OFFLINE' : 'ONLINE');
         } catch (error) {
             console.error("GOD MODE ACTION FAILED", error);
-            alert("SYSTEM ERROR: Command execution failed");
+            alert("SYSTEM ERROR: Command execution failed. Ensure Backend is running and supports /god/config route.");
         } finally {
             setLoading(false);
         }
