@@ -120,6 +120,24 @@ const App: React.FC = () => {
     return <GodMode />;
   }
 
+  if (config.maintenance_mode === 'true') {
+    return (
+      <div className="min-h-screen bg-[#fcfdfd]">
+        <MaintenancePage onOpenLogin={openLogin} />
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onSwitchToSignUp={openSignUp}
+        />
+        <SignUpModal
+          isOpen={isSignUpModalOpen}
+          onClose={() => setIsSignUpModalOpen(false)}
+          onSwitchToLogin={openLogin}
+        />
+      </div>
+    );
+  }
+
   const isAtAdmin = location.pathname.startsWith('/admin');
 
   if (isAtAdmin) {
@@ -140,24 +158,6 @@ const App: React.FC = () => {
         </Routes>
       </div>
       // </SiteConfigProvider>
-    );
-  }
-
-  if (config.maintenance_mode === 'true' && !isAdminAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#fcfdfd]">
-        <MaintenancePage onOpenLogin={openLogin} />
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onSwitchToSignUp={openSignUp}
-        />
-        <SignUpModal
-          isOpen={isSignUpModalOpen}
-          onClose={() => setIsSignUpModalOpen(false)}
-          onSwitchToLogin={openLogin}
-        />
-      </div>
     );
   }
 
