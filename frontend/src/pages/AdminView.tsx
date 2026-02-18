@@ -42,13 +42,14 @@ import {
   X,
   EyeOff,
   MessageSquare,
-  Send
+  Send,
+  Power
 } from 'lucide-react';
 import { propertyService, requirementService, adminService, API_URL } from '@/services/api';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import { Property, Requirement, User } from '@/types/types';
 
-type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Users' | 'Payments' | 'Settings' | 'Moderation' | 'CMS';
+type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Users' | 'Payments' | 'Settings' | 'Moderation' | 'CMS' | 'System';
 
 interface AdminViewProps {
   onLogout: () => void;
@@ -276,6 +277,21 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export data');
+    }
+  }
+  const toggleSystemStatus = async () => {
+    const newStatus = localConfig.maintenance_mode === 'true' ? 'false' : 'true';
+    // Optimistic update
+    setLocalConfig(prev => ({ ...prev, maintenance_mode: newStatus }));
+
+    try {
+      await adminService.updateConfig({ ...localConfig, maintenance_mode: newStatus });
+      await refreshConfig();
+    } catch (error) {
+      console.error('Failed to toggle system status:', error);
+      alert('Failed to update system status');
+      // Revert on failure
+      setLocalConfig(config);
     }
   };
 
@@ -836,15 +852,30 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Application Name</label>
-                      <input type="text" defaultValue="RJG Property Connect" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm" />
+                      <input
+                        type="text"
+                        value={localConfig.site_name || ''}
+                        onChange={(e) => updateLocalConfig('site_name', e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm"
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Support Email</label>
-                      <input type="email" defaultValue="hq@rjgproperty.com" className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm" />
+                      <input
+                        type="email"
+                        value={localConfig.support_email || ''}
+                        onChange={(e) => updateLocalConfig('support_email', e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm"
+                      />
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-sm font-medium text-gray-700">Site Description</label>
-                      <textarea rows={3} defaultValue="The premier real estate bridge for Rajnandgaon and beyond." className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm resize-none" />
+                      <textarea
+                        rows={3}
+                        value={localConfig.site_description || ''}
+                        onChange={(e) => updateLocalConfig('site_description', e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm resize-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -867,7 +898,12 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 font-medium">₹</span>
-                      <input type="number" defaultValue={500} className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm font-semibold" />
+                      <input
+                        type="number"
+                        value={localConfig.verification_fee || ''}
+                        onChange={(e) => updateLocalConfig('verification_fee', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm font-semibold"
+                      />
                     </div>
                   </div>
                 </div>
@@ -904,7 +940,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
               </div>
 
               <div className="flex gap-4 pt-4">
-                <button className="px-6 py-2.5 bg-[#40a28f] text-white rounded-lg text-sm font-medium hover:bg-[#358a7a] transition-colors shadow-sm">
+                <button
+                  onClick={saveConfig}
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-[#40a28f] text-white rounded-lg text-sm font-medium hover:bg-[#358a7a] transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                   Save Changes
                 </button>
                 <button className="px-6 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
@@ -1256,7 +1296,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
               { id: 'Requirements', icon: ClipboardList },
               { id: 'Users', icon: Users },
               { id: 'Payments', icon: CreditCard },
+              { id: 'Payments', icon: CreditCard },
+              { id: 'CMS', icon: Palette },
               { id: 'Settings', icon: Settings },
+              { id: 'System', icon: Power },
             ].map((item) => (
               <button
                 key={item.id}
