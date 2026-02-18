@@ -7,6 +7,7 @@ interface SiteConfig {
 
 interface SiteConfigContextType {
     config: SiteConfig;
+    loading: boolean;
     refreshConfig: () => Promise<void>;
     updateConfig: (key: string, value: string) => void;
 }
@@ -14,12 +15,14 @@ interface SiteConfigContextType {
 const SiteConfigContext = createContext<SiteConfigContextType | undefined>(undefined);
 
 export const SiteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [loading, setLoading] = useState(true);
     const [config, setConfig] = useState<SiteConfig>({
         site_name: 'RJG Property Connect',
         support_email: 'hq@rjgproperty.com',
         hero_title: 'Property Requirements',
         hero_subtitle: 'Browse what buyers and tenants are looking for in Rajnandgaon, or post your own requirement to connect with property owners.',
-        about_text: 'The premier real estate bridge for Rajnandgaon and beyond. Verified community property intelligence.'
+        about_text: 'The premier real estate bridge for Rajnandgaon and beyond. Verified community property intelligence.',
+        maintenance_mode: 'true' // Default to maintenance mode for safety
     });
 
     const fetchConfig = async () => {
@@ -31,6 +34,8 @@ export const SiteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             }
         } catch (error) {
             console.error('Failed to fetch site config', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -43,7 +48,7 @@ export const SiteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, []);
 
     return (
-        <SiteConfigContext.Provider value={{ config, refreshConfig: fetchConfig, updateConfig }}>
+        <SiteConfigContext.Provider value={{ config, loading, refreshConfig: fetchConfig, updateConfig }}>
             {children}
         </SiteConfigContext.Provider>
     );

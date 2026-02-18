@@ -24,7 +24,7 @@ import MyListView from './pages/MyListView';
 import PropertyDetailsView from './pages/PropertyDetailsView';
 
 const App: React.FC = () => {
-  const { config } = useSiteConfig();
+  const { config, loading } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -106,6 +106,14 @@ const App: React.FC = () => {
       default: navigate('/');
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#fcfdfd]">
+        <div className="w-16 h-16 border-4 border-[#40a28f]/20 border-t-[#40a28f] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const isAtAdmin = location.pathname.startsWith('/admin');
 
