@@ -3,7 +3,8 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { authService } from './services/api';
-import { SiteConfigProvider } from './contexts/SiteConfigContext';
+import { useSiteConfig } from './contexts/SiteConfigContext';
+import MaintenancePage from './components/MaintenancePage';
 import BrowsePropertiesView from './pages/BrowsePropertiesView';
 import RequirementsView from './pages/RequirementsView';
 import MyListingsView from './pages/MyListingsView';
@@ -23,6 +24,7 @@ import MyListView from './pages/MyListView';
 import PropertyDetailsView from './pages/PropertyDetailsView';
 
 const App: React.FC = () => {
+  const { config } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -109,74 +111,92 @@ const App: React.FC = () => {
 
   if (isAtAdmin) {
     return (
-      <SiteConfigProvider>
-        <div className="h-screen bg-[#fcfdfd]">
-          <Routes>
-            <Route
-              path="/admin/*"
-              element={
-                isAdminAuthenticated ? (
-                  <AdminView onLogout={handleAdminLogout} />
-                ) : (
-                  <AdminLogin onLogin={handleAdminLogin} />
-                )
-              }
-            />
-          </Routes>
-        </div>
-      </SiteConfigProvider>
+      // <SiteConfigProvider> Removed: now in main.tsx
+      <div className="h-screen bg-[#fcfdfd]">
+        <Routes>
+          <Route
+            path="/admin/*"
+            element={
+              isAdminAuthenticated ? (
+                <AdminView onLogout={handleAdminLogout} />
+              ) : (
+                <AdminLogin onLogin={handleAdminLogin} />
+              )
+            }
+          />
+        </Routes>
+      </div>
+      // </SiteConfigProvider>
     );
   }
 
-  return (
-    <SiteConfigProvider>
-      <div className="min-h-screen flex flex-col bg-[#fcfdfd]">
-        <Navbar
-          currentView={currentView}
-          onViewChange={handleViewChange}
-          onOpenLogin={openLogin}
-          onOpenSignUp={openSignUp}
-          onLogout={handleUserLogout}
-        />
-
-        <div className="flex-grow">
-          <Routes>
-            <Route path="/" element={<BrowsePropertiesView onNavigateToRequirements={() => navigate('/requirements')} onOpenLogin={openLogin} />} />
-            <Route path="/properties/:id" element={<PropertyDetailsView />} />
-            <Route path="/requirements" element={<RequirementsView />} />
-            <Route path="/about" element={<AboutView />} />
-            <Route path="/contact" element={<ContactView />} />
-            <Route path="/dashboard" element={<DashboardView />} />
-            <Route path="/listings" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/account" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/mylist" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/reset-password" element={<ResetPasswordView />} />
-            <Route
-              path="/admin/*"
-              element={
-                isAdminAuthenticated ? <AdminView onLogout={handleAdminLogout} /> : <AdminLogin onLogin={handleAdminLogin} />
-              }
-            />
-            <Route path="*" element={<NotFoundView />} />
-          </Routes>
-        </div>
-
+  if (config.maintenance_mode === 'true' && !isAdminAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#fcfdfd]">
+        <MaintenancePage onOpenLogin={openLogin} />
         <LoginModal
           isOpen={isLoginModalOpen}
           onClose={() => setIsLoginModalOpen(false)}
           onSwitchToSignUp={openSignUp}
         />
-
         <SignUpModal
           isOpen={isSignUpModalOpen}
           onClose={() => setIsSignUpModalOpen(false)}
           onSwitchToLogin={openLogin}
         />
-
-        <Footer />
       </div>
-    </SiteConfigProvider>
+    );
+  }
+
+  return (
+    // <SiteConfigProvider> Removed: now in main.tsx
+    <div className="min-h-screen flex flex-col bg-[#fcfdfd]">
+      <Navbar
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        onOpenLogin={openLogin}
+        onOpenSignUp={openSignUp}
+        onLogout={handleUserLogout}
+      />
+
+      <div className="flex-grow">
+        <Routes>
+          <Route path="/" element={<BrowsePropertiesView onNavigateToRequirements={() => navigate('/requirements')} onOpenLogin={openLogin} />} />
+          <Route path="/properties/:id" element={<PropertyDetailsView />} />
+          <Route path="/requirements" element={<RequirementsView />} />
+          <Route path="/about" element={<AboutView />} />
+          <Route path="/contact" element={<ContactView />} />
+          <Route path="/dashboard" element={<DashboardView />} />
+          <Route path="/listings" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/account" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/mylist" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/reset-password" element={<ResetPasswordView />} />
+          <Route
+            path="/admin/*"
+            element={
+              isAdminAuthenticated ? <AdminView onLogout={handleAdminLogout} /> : <AdminLogin onLogin={handleAdminLogin} />
+            }
+          />
+          <Route path="*" element={<NotFoundView />} />
+        </Routes>
+      </div>
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSwitchToSignUp={openSignUp}
+      />
+
+      <SignUpModal
+        isOpen={isSignUpModalOpen}
+        onClose={() => setIsSignUpModalOpen(false)}
+        onSwitchToLogin={openLogin}
+      />
+
+      <Footer />
+    </div>
+    // </SiteConfigProvider>
   );
 };
 
