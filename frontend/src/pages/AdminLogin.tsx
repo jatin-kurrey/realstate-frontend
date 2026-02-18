@@ -94,6 +94,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                 <p className="text-center mt-10 text-[9px] font-bold text-gray-300 uppercase tracking-[0.5em] opacity-50">
                     Encrypted Connection • Rajnandgaon Property Network
                 </p>
+                <div className="mt-4 text-center">
+                    <p className="text-[10px] text-gray-400 font-mono bg-gray-50 inline-block px-3 py-1 rounded-full border border-gray-100">
+                        CREDENTIALS: admin@rjg.com / admin123
+                    </p>
+                </div>
             </div>
         </div>
     );

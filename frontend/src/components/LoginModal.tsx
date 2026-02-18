@@ -165,9 +165,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
                 <ShieldCheck className="h-4 w-4" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Admin Access Details</span>
               </div>
-              <div className="flex justify-between text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg">
+              <div className="flex justify-between text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg mb-2">
                 <span>Email: <span className="text-gray-800">admin@rjg.com</span></span>
                 <span>Pass: <span className="text-gray-800">admin123</span></span>
+              </div>
+              <div className="flex justify-between text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg">
+                <span>God Mode Key: <span className="text-gray-800">RJG_GOD_ACCESS_2024</span></span>
               </div>
             </div>
           </div>

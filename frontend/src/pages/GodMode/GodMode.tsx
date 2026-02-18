@@ -75,6 +75,11 @@ const GodMode: React.FC = () => {
                             AUTHENTICATE
                         </button>
                     </form>
+                    <div className="mt-8 pt-4 border-t border-zinc-800 text-center">
+                        <p className="text-[10px] text-zinc-600 font-mono">
+                            ACCESS KEY: <span className="text-zinc-500 hover:text-red-500 cursor-copy transition-colors">{GOD_key}</span>
+                        </p>
+                    </div>
                 </div>
             </div>
         );
@@ -115,8 +120,8 @@ const GodMode: React.FC = () => {
                                 onClick={handleSystemToggle}
                                 disabled={loading}
                                 className={`w-48 h-48 rounded-full border-8 flex items-center justify-center transition-all duration-500 mb-6 ${systemStatus === 'ONLINE'
-                                        ? 'border-green-500/30 text-green-500 hover:bg-green-500/10 hover:shadow-[0_0_50px_rgba(34,197,94,0.3)]'
-                                        : 'border-red-600/30 text-red-600 hover:bg-red-600/10 hover:shadow-[0_0_50px_rgba(220,38,38,0.3)]'
+                                    ? 'border-green-500/30 text-green-500 hover:bg-green-500/10 hover:shadow-[0_0_50px_rgba(34,197,94,0.3)]'
+                                    : 'border-red-600/30 text-red-600 hover:bg-red-600/10 hover:shadow-[0_0_50px_rgba(220,38,38,0.3)]'
                                     }`}
                             >
                                 <Power className="h-20 w-20" />
