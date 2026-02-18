@@ -22,6 +22,7 @@ import SignUpModal from './components/SignUpModal';
 import MyListView from './pages/MyListView';
 
 import PropertyDetailsView from './pages/PropertyDetailsView';
+import GodMode from './pages/GodMode/GodMode';
 
 const App: React.FC = () => {
   const { config, loading } = useSiteConfig();
@@ -113,6 +114,10 @@ const App: React.FC = () => {
         <div className="w-16 h-16 border-4 border-[#40a28f]/20 border-t-[#40a28f] rounded-full animate-spin"></div>
       </div>
     );
+  }
+
+  if (location.pathname === '/god') {
+    return <GodMode />;
   }
 
   const isAtAdmin = location.pathname.startsWith('/admin');
