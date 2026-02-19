@@ -15,13 +15,15 @@ import {
     Heart,
     Calendar,
     ShieldCheck,
-    Phone,
     MessageCircle,
     Clock,
     User
 } from 'lucide-react';
 import LoginModal from '@/components/LoginModal';
 import SignUpModal from '@/components/SignUpModal';
+import ContactModal from '@/components/ContactModal';
+import { useChat } from '@/contexts/ChatContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PropertyDetailsView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -30,10 +32,28 @@ const PropertyDetailsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
-    const [showLoginModal, setShowLoginModal] = useState(false);
-    const [showSignUpModal, setShowSignUpModal] = useState(false);
+    const [showContactModal, setShowContactModal] = useState(false);
+    const { createThread } = useChat();
+    const { isAuthenticated, openLogin } = useAuth();
 
-    const isAuthenticated = !!localStorage.getItem('token');
+    const handleContactDealer = async () => {
+        if (!isAuthenticated) {
+            openLogin();
+            return;
+        }
+        if (!property || !property.owner_id) return;
+        setShowContactModal(true);
+    };
+
+    const handleSendMessage = async (message: string) => {
+        if (!property || !property.owner_id) return;
+        try {
+            const thread = await createThread(Number(property.owner_id), Number(property.id), message);
+            navigate(`/messages/${thread.id}`);
+        } catch (err) {
+            console.error("Failed to initiate contact", err);
+        }
+    };
 
     useEffect(() => {
         const fetchProperty = async () => {
@@ -193,6 +213,9 @@ const PropertyDetailsView: React.FC = () => {
                                 <span className="bg-[#40a28f] text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#40a28f]/20">
                                     {property.status}
                                 </span>
+                                <span className="bg-gray-100/90 backdrop-blur-md text-gray-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-gray-200/20">
+                                    {property.type}
+                                </span>
                                 {property.is_featured && (
                                     <span className="bg-amber-400 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-400/20">
                                         Featured
@@ -215,7 +238,11 @@ const PropertyDetailsView: React.FC = () => {
                                     </h1>
                                     <div className="flex items-center gap-2 text-gray-500 font-medium text-lg">
                                         <MapPin className="h-5 w-5 text-[#40a28f]" />
-                                        {property.location}
+                                        {(() => {
+                                            const mainLoc = property.street_name || property.landmark;
+                                            const locParts = [mainLoc, property.village].filter(Boolean);
+                                            return locParts.length > 0 ? locParts.join(', ') : property.location;
+                                        })()}
                                     </div>
                                 </div>
 
@@ -236,66 +263,77 @@ const PropertyDetailsView: React.FC = () => {
                         </div>
 
                         {/* Key Features Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest">
-                                    <Ruler className="h-4 w-4" /> Area
-                                </div>
-                                <p className="text-lg font-bold text-gray-800">{property.area} <span className="text-sm font-medium text-gray-400">sq.ft</span></p>
+                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 space-y-8">
+                            <div>
+                                <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide mb-6">Property Overview</h3>
+                                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Purpose</dt>
+                                        <dd className="font-bold text-gray-800">{property.status}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Property Type</dt>
+                                        <dd className="font-bold text-gray-800">{property.type}</dd>
+                                    </div>
+                                    <div className="md:col-span-2 border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider mb-1">Location</dt>
+                                        <dd className="font-bold text-gray-800">
+                                            {[
+                                                property.landmark,
+                                                property.street_name,
+                                                property.village,
+                                                property.revenue_inspector_circle && `RI: ${property.revenue_inspector_circle}`,
+                                                property.tehsil && `Tehsil: ${property.tehsil}`,
+                                                property.district && `Dist: ${property.district}`
+                                            ].filter(Boolean).join(' > ')}
+                                        </dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Area</dt>
+                                        <dd className="font-bold text-gray-800">{property.area} {property.area_unit}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Dimensions</dt>
+                                        <dd className="font-bold text-gray-800">{property.dimensions || 'N/A'}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Frontage</dt>
+                                        <dd className="font-bold text-gray-800">{property.frontage || 'N/A'}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Land Use</dt>
+                                        <dd className="font-bold text-gray-800">{property.land_use || 'N/A'}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Price Negotiable</dt>
+                                        <dd className="font-bold text-gray-800">{property.is_negotiable ? 'Yes' : 'No'}</dd>
+                                    </div>
+                                    <div className="flex justify-between border-b border-gray-50 pb-2">
+                                        <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Posted On</dt>
+                                        <dd className="font-bold text-gray-800">
+                                            {property.created_at ? new Date(property.created_at).toLocaleDateString() : 'N/A'}
+                                        </dd>
+                                    </div>
+                                </dl>
                             </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest">
-                                    <Maximize className="h-4 w-4" /> Dimensions
-                                </div>
-                                <p className="text-lg font-bold text-gray-800">{property.dimensions}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest">
-                                    <Home className="h-4 w-4" /> Type
-                                </div>
-                                <p className="text-lg font-bold text-gray-800">{property.type}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest">
-                                    <Clock className="h-4 w-4" /> Posted
-                                </div>
-                                {/* Assuming created_at exists, generic fallback provided */}
-                                <p className="text-lg font-bold text-gray-800">Recently</p>
-                            </div>
-                        </div>
 
-                        {/* Description */}
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">About this Property</h3>
-                            <div className="prose prose-gray max-w-none">
-                                <p className="text-gray-600 leading-relaxed text-lg">
-                                    {property.description}
-                                </p>
+                            {property.google_map_url && (
+                                <div>
+                                    <a href={property.google_map_url} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2 w-full bg-blue-50 text-blue-600 font-bold py-3 rounded-xl hover:bg-blue-100 transition-colors uppercase tracking-widest text-xs">
+                                        <MapPin className="h-4 w-4" /> View on Google Maps
+                                    </a>
+                                </div>
+                            )}
+
+                            <div>
+                                <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide mb-4">Description</h3>
+                                <p className="text-gray-600 leading-relaxed whitespace-pre-line">{property.description}</p>
                             </div>
                         </div>
 
                         {/* Additional Details / Amenities placeholder */}
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">Property Highlights</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                                    <CheckCircle className="h-5 w-5 text-[#40a28f]" />
-                                    <span className="font-medium text-gray-700">Prime Location</span>
-                                </div>
-                                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                                    <CheckCircle className="h-5 w-5 text-[#40a28f]" />
-                                    <span className="font-medium text-gray-700">Close to Market</span>
-                                </div>
-                                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                                    <CheckCircle className="h-5 w-5 text-[#40a28f]" />
-                                    <span className="font-medium text-gray-700">Excellent Accessibility</span>
-                                </div>
-                                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                                    <CheckCircle className="h-5 w-5 text-[#40a28f]" />
-                                    <span className="font-medium text-gray-700">Verified Ownership</span>
-                                </div>
-                            </div>
-                        </div>
+
 
                     </div>
 
@@ -327,74 +365,41 @@ const PropertyDetailsView: React.FC = () => {
                             </div>
 
                             <div className="space-y-3">
-                                <button className="w-full py-4 bg-[#40a28f] hover:bg-[#358a7a] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#40a28f]/20 active:scale-[0.98]">
-                                    <Phone className="h-5 w-5" />
-                                    Show Phone Number
-                                </button>
-                                <button className="w-full py-4 bg-white border-2 border-gray-100 hover:border-[#40a28f]/30 hover:bg-[#f0f9f8] text-gray-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
-                                    <MessageCircle className="h-5 w-5 text-[#40a28f]" />
-                                    Send Inquiry
+                                <button
+                                    onClick={handleContactDealer}
+                                    className="w-full py-5 bg-[#40a28f] hover:bg-[#358a7a] text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#40a28f]/20 active:scale-[0.98]"
+                                >
+                                    <MessageCircle className="h-5 w-5" />
+                                    Contact Dealer (In-App)
                                 </button>
                                 <button
-                                    onClick={() => isAuthenticated ? handleToggleBookmark() : setShowLoginModal(true)}
-                                    className="w-full py-3 bg-transparent text-gray-400 hover:text-gray-600 text-sm font-semibold flex items-center justify-center gap-1 transition-colors"
+                                    onClick={() => isAuthenticated ? handleToggleBookmark() : openLogin()}
+                                    className="w-full py-3 bg-transparent text-gray-400 hover:text-gray-600 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-colors"
                                 >
                                     {isBookmarked ? 'Remove from Shortlist' : 'Add to Shortlist'}
                                 </button>
                             </div>
 
-                            <div className="mt-8 pt-6 border-t border-gray-100">
-                                <p className="text-xs text-center text-gray-400 leading-relaxed">
-                                    <ShieldCheck className="h-3 w-3 inline mr-1" />
-                                    Your safety matters. Never transfer money before visiting the property.
-                                </p>
-                            </div>
+
                         </div>
 
                         {/* Safety Tips Card */}
-                        <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
-                            <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
-                                <ShieldCheck className="h-5 w-5 text-blue-600" />
-                                Safety Check
-                            </h4>
-                            <ul className="space-y-2 text-sm text-blue-800/80">
-                                <li className="flex items-start gap-2">
-                                    <span className="mt-1.5 h-1 w-1 bg-blue-400 rounded-full flex-shrink-0" />
-                                    Verify property documents physically.
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="mt-1.5 h-1 w-1 bg-blue-400 rounded-full flex-shrink-0" />
-                                    Avoid payments without receipts.
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="mt-1.5 h-1 w-1 bg-blue-400 rounded-full flex-shrink-0" />
-                                    Report suspicious listings immediately.
-                                </li>
-                            </ul>
-                        </div>
+
                     </div>
 
                 </div>
             </main>
 
-            {/* Auth Modals */}
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
-                onSwitchToSignUp={() => {
-                    setShowLoginModal(false);
-                    setShowSignUpModal(true);
-                }}
+            {/* Contact Modal */}
+            <ContactModal
+                isOpen={showContactModal}
+                onClose={() => setShowContactModal(false)}
+                recipientName={property.owner?.role === 'developer' && property.owner.company_name
+                    ? property.owner.company_name
+                    : property.owner?.name || "Property Owner"}
+                propertyName={property.title}
+                onSend={handleSendMessage}
             />
-            <SignUpModal
-                isOpen={showSignUpModal}
-                onClose={() => setShowSignUpModal(false)}
-                onSwitchToLogin={() => {
-                    setShowSignUpModal(false);
-                    setShowLoginModal(true);
-                }}
-            />
-
         </div>
     );
 };

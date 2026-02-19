@@ -44,7 +44,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="admin@rjgproperty.com"
+                                    placeholder="admin@rjg.com"
                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-5 px-8 focus:outline-none focus:border-[#40a28f] focus:ring-4 focus:ring-[#40a28f]/5 transition-all text-sm font-bold text-gray-800"
                                     required
                                 />

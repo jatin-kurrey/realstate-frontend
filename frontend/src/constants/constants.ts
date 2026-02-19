@@ -14,11 +14,12 @@ export const MOCK_PROPERTIES: Property[] = [
     title: 'Modern 3BHK Apartment',
     location: 'Civil Lines, Rajnandgaon',
     area: 1500,
-    dimensions: '50x30 ft',
+    area_unit: 'sqft',
+    frontage: '50 ft',
     description: 'Beautiful 3BHK apartment with modern amenities and park facing view.',
     price: 4500000,
     status: 'Sale',
-    type: 'Residential',
+    type: 'Residential Building',
     imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800'
   },
   {
@@ -26,7 +27,8 @@ export const MOCK_PROPERTIES: Property[] = [
     title: 'Commercial Shop in Main Market',
     location: 'Ganj Para, Rajnandgaon',
     area: 400,
-    dimensions: '20x20 ft',
+    area_unit: 'sqft',
+    frontage: '20 ft',
     description: 'Prime location shop suitable for retail business.',
     price: 15000,
     status: 'Rent',
@@ -38,11 +40,12 @@ export const MOCK_PROPERTIES: Property[] = [
     title: 'Luxury Villa with Garden',
     location: 'Basantpur, Rajnandgaon',
     area: 2400,
-    dimensions: '60x40 ft',
+    area_unit: 'sqft',
+    frontage: '60 ft',
     description: 'Independent villa with spacious garden and double car parking.',
     price: 8500000,
     status: 'Sale',
-    type: 'Residential',
+    type: 'Residential Building',
     imageUrl: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&q=80&w=800'
   }
 ];
@@ -51,7 +54,7 @@ export const MOCK_REQUIREMENTS: Requirement[] = [
   {
     id: '1',
     purpose: 'Buy',
-    type: 'Residential',
+    type: 'Residential Building',
     minBudget: 600000,
     maxBudget: 900000,
     location: 'Riverside, Lakeview',
@@ -87,7 +90,7 @@ export const MOCK_REQUIREMENTS: Requirement[] = [
   {
     id: '4',
     purpose: 'Rent',
-    type: 'Residential',
+    type: 'Residential Building',
     minBudget: 1500,
     maxBudget: 2600,
     location: 'Central Park, Brooklyn Arts District',

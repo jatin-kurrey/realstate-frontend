@@ -1,16 +1,27 @@
 import React from 'react';
-import { Home, ShieldCheck, Users, Target, Award, MapPin } from 'lucide-react';
+import { Home, ShieldCheck, Users, Target, Award, MapPin, Mail, Phone, Send, Instagram, Twitter, Facebook, Loader2 } from 'lucide-react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 const AboutView: React.FC = () => {
     const { config } = useSiteConfig();
+    const [sending, setSending] = React.useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSending(true);
+        setTimeout(() => {
+            setSending(false);
+            alert('Your message has been sent successfully!');
+        }, 1500);
+    };
 
     return (
         <main className="min-h-screen bg-[#fcfdfd]">
             <div className="max-w-7xl mx-auto px-4 pt-6">
                 <Breadcrumbs />
             </div>
+
             {/* Hero Section */}
             <div className="bg-[#40a28f] py-24 px-4 text-center text-white">
                 <div className="max-w-4xl mx-auto space-y-6">
@@ -88,8 +99,80 @@ const AboutView: React.FC = () => {
                 </div>
             </section>
 
-            {/* Location CTA */}
+            {/* Contact Section Integrated */}
             <section className="max-w-7xl mx-auto px-4 py-24">
+                <div className="bg-white rounded-[64px] border border-gray-100 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+                    <div className="bg-[#40a28f] p-12 md:p-20 text-white space-y-8">
+                        <div className="space-y-4">
+                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60">Contact Us</span>
+                            <h2 className="text-5xl font-black uppercase tracking-tighter leading-none">Get In <br />Touch.</h2>
+                        </div>
+                        <p className="text-lg text-white/80 font-medium">
+                            Have questions or need assistance? Our local team in Rajnandgaon is here for you.
+                        </p>
+
+                        <div className="space-y-6 pt-6">
+                            <div className="flex items-center gap-4">
+                                <Mail className="h-5 w-5 text-white/60" />
+                                <span className="font-bold">{config.support_email || 'hello@rjgproperty.com'}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <Phone className="h-5 w-5 text-white/60" />
+                                <span className="font-bold">{config.phone_number || '+91 98765 43210'}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <MapPin className="h-5 w-5 text-white/60" />
+                                <span className="font-bold">{config.office_address || 'Rajnandgaon, Chhattisgarh'}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 pt-8">
+                            {[Instagram, Twitter, Facebook].map((Icon, idx) => (
+                                <button key={idx} className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all">
+                                    <Icon className="h-5 w-5" />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="p-12 md:p-20">
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Send a Message</h3>
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">We'll get back to you shortly</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Name</label>
+                                    <input type="text" placeholder="Full Name" className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 px-4 focus:outline-none focus:border-[#40a28f] text-sm font-bold" required />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                                    <input type="email" placeholder="Email Address" className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 px-4 focus:outline-none focus:border-[#40a28f] text-sm font-bold" required />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Message</label>
+                                <textarea rows={4} placeholder="How can we help?" className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3 px-4 focus:outline-none focus:border-[#40a28f] text-sm font-bold resize-none" required></textarea>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={sending}
+                                className="w-full bg-[#40a28f] text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-xl shadow-[#40a28f]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                Send Message
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            {/* Location CTA */}
+            <section className="max-w-7xl mx-auto px-4 py-24 pb-32">
                 <div className="bg-[#1e293b] rounded-[64px] p-12 md:p-20 text-white flex flex-col md:flex-row items-center justify-between gap-12 relative overflow-hidden">
                     <div className="space-y-6 relative z-10 w-full md:w-2/3">
                         <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tight leading-none text-center md:text-left">
@@ -105,7 +188,6 @@ const AboutView: React.FC = () => {
                             <MapPin className="h-20 w-20 text-white -rotate-12" />
                         </div>
                     </div>
-                    {/* Decorative blobs */}
                     <div className="absolute top-0 right-0 w-96 h-96 bg-[#40a28f]/5 rounded-full blur-[100px] -mr-48 -mt-48"></div>
                 </div>
             </section>

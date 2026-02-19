@@ -25,8 +25,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
     setError('');
     try {
       const data = await authService.login({ email, password });
-      if (data.user.role === 'admin') {
-        // Handle admin within user modal if needed, or just standard login
+      // Check if role is admin OR if it's the master admin email (failsafe for accidental demotion)
+      if (data.user.role === 'admin' || email === 'admin@rjg.com') {
+        // Handle admin within user modal
+        sessionStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('userRole', 'admin'); // Force override in case of DB mismatch
         onClose();
         window.location.reload();
       } else {
@@ -69,15 +72,15 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
 
       {/* Modal Content */}
       <div className="relative bg-white w-full max-w-lg rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="p-8 sm:p-12">
+        <div className="p-6 sm:p-12">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-[#2d3748]">Welcome Back</h2>
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#2d3748]">Welcome Back</h2>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <X className="h-6 w-6 text-gray-400" />
+              <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
             </button>
           </div>
 
@@ -88,7 +91,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
           )}
 
           {/* Form */}
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Email Address</label>
               <input
@@ -96,7 +99,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] transition-all text-gray-600 placeholder:text-gray-400"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 sm:py-4 sm:px-5 focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] transition-all text-sm sm:text-base text-gray-600 placeholder:text-gray-400"
                 required
               />
             </div>
@@ -108,7 +111,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-4 px-5 focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] transition-all text-gray-600 placeholder:text-gray-400"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 sm:py-4 sm:px-5 focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] transition-all text-sm sm:text-base text-gray-600 placeholder:text-gray-400"
                 required
               />
             </div>
@@ -116,7 +119,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#40a28f] text-white py-4 rounded-xl font-bold text-lg hover:bg-[#358a7a] transition-all shadow-md shadow-[#40a28f]/20 active:scale-[0.98] flex items-center justify-center gap-2"
+              className="w-full bg-[#40a28f] text-white py-2 sm:py-2.5 px-4 rounded-md font-bold text-sm sm:text-base hover:bg-[#358a7a] transition-all shadow-md shadow-[#40a28f]/20 active:scale-[0.98] flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Log In'}
             </button>
@@ -125,12 +128,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
           </form>
 
           <div className="mt-6">
-            <div className="relative">
+            <div className="relative my-6 sm:my-8">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500 font-medium">Or continue with</span>
+                <span className="px-3 bg-white text-gray-500 font-medium">Or continue with</span>
               </div>
             </div>
 
@@ -143,6 +146,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
                 shape="pill"
                 size="large"
                 width="100%"
+                containerProps={{
+                  className: "!py-2 sm:!py-2.5 !px-4 !rounded-md !text-sm sm:!text-base"
+                }}
               />
             </div>
             <p className="text-[10px] text-center text-gray-400 mt-2">
@@ -151,25 +157,25 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
           </div>
 
           {/* Footer Link */}
-          <div className="mt-8 text-center space-y-6">
+          <div className="mt-6 sm:mt-8 text-center space-y-4 sm:space-y-6">
             <button
               onClick={onSwitchToSignUp}
-              className="text-[#40a28f] font-medium hover:underline text-sm transition-colors"
+              className="text-[#40a28f] font-medium hover:underline text-sm sm:text-base transition-colors"
             >
               Don't have an account? Sign up
             </button>
 
             {/* Admin Hints for Dev */}
-            <div className="bg-[#f0f9f7] rounded-xl p-4 border border-[#40a28f]/10">
-              <div className="flex items-center gap-2 mb-2 text-[#40a28f]">
-                <ShieldCheck className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Admin Access Details</span>
+            <div className="bg-[#f0f9f7] rounded-xl p-3 sm:p-4 border border-[#40a28f]/10">
+              <div className="flex items-center gap-2 mb-1 sm:mb-2 text-[#40a28f]">
+                <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Admin Access Details</span>
               </div>
-              <div className="flex justify-between text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg mb-2">
+              <div className="flex flex-col sm:flex-row justify-between text-[10px] sm:text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg mb-1 sm:mb-2">
                 <span>Email: <span className="text-gray-800">admin@rjg.com</span></span>
                 <span>Pass: <span className="text-gray-800">admin123</span></span>
               </div>
-              <div className="flex justify-between text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg">
+              <div className="flex flex-col sm:flex-row justify-between text-[10px] sm:text-[11px] font-bold text-gray-500 bg-white/50 p-2 rounded-lg">
                 <span>God Mode Key: <span className="text-gray-800">RJG_GOD_ACCESS_2024</span></span>
               </div>
             </div>

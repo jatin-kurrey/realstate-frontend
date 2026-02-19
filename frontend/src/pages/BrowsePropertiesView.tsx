@@ -1,9 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FilterBar from '@/components/FilterBar';
 import PropertyCard from '@/components/PropertyCard';
 import Pagination from '@/components/Pagination';
+import AdvertisementBanner from '@/components/AdvertisementBanner';
+import AddPropertyModal from '@/components/AddPropertyModal';
 import { propertyService } from '@/services/api';
 import { Property } from '@/types/types';
 import { ArrowRight, Loader2 } from 'lucide-react';
@@ -21,14 +22,17 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
   const navigate = useNavigate();
   const { config } = useSiteConfig();
   const [properties, setProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn] = useState(!!localStorage.getItem('token'));
+  const [isAddPropertyModalOpen, setIsAddPropertyModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         const data = await propertyService.getAll();
         setProperties(data);
+        setFilteredProperties(data);
       } catch (error) {
         console.error('Failed to fetch properties:', error);
       } finally {
@@ -40,6 +44,87 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
 
   const handleOpenDetail = (property: Property) => {
     navigate(`/properties/${property.id}`);
+  };
+
+  const handlePostProperty = () => {
+    if (isLoggedIn) {
+      setIsAddPropertyModalOpen(true);
+    } else {
+      onOpenLogin();
+    }
+  };
+
+  const handlePropertySuccess = () => {
+    setLoading(true);
+    propertyService.getAll().then(data => {
+      setProperties(data);
+      setFilteredProperties(data);
+      setLoading(false);
+    });
+  };
+
+  const handleSearch = (filters: any) => {
+    let filtered = [...properties];
+
+    // Search Query
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.title?.toLowerCase().includes(query) ||
+        p.location?.toLowerCase().includes(query) ||
+        p.street_name?.toLowerCase().includes(query) ||
+        p.village?.toLowerCase().includes(query) ||
+        p.land_use?.toLowerCase().includes(query) ||
+        (p.landmark && p.landmark.toLowerCase().includes(query))
+      );
+    }
+
+    // Purpose
+    if (filters.purpose && filters.purpose !== 'All') {
+      filtered = filtered.filter(p => p.status === filters.purpose);
+    }
+
+    // Type
+    if (filters.type && filters.type !== 'All') {
+      filtered = filtered.filter(p => p.type === filters.type);
+    }
+
+    // Location Hierarchy (Naive Check)
+    if (filters.district && !filters.district.includes('Select')) {
+      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.district.toLowerCase()));
+    }
+    if (filters.tehesil && !filters.tehesil.includes('Select')) {
+      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.tehesil.toLowerCase()));
+    }
+    if (filters.riCircle && !filters.riCircle.includes('Select')) {
+      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.riCircle.toLowerCase()));
+    }
+    if (filters.village && !filters.village.includes('Select')) {
+      filtered = filtered.filter(p =>
+        (p.village && p.village.toLowerCase().includes(filters.village.toLowerCase())) ||
+        p.location.toLowerCase().includes(filters.village.toLowerCase())
+      );
+    }
+
+    // Area Range
+    const normalizeArea = (area: number, unit: string) => {
+      if (unit === 'acre') return area * 43560;
+      return area;
+    };
+
+    if (filters.minArea || filters.maxArea) {
+      const filterUnit = filters.areaUnit || 'sqft';
+      // If minArea/maxArea are strings, parse them.
+      const min = filters.minArea ? normalizeArea(parseFloat(filters.minArea), filterUnit) : 0;
+      const max = filters.maxArea ? normalizeArea(parseFloat(filters.maxArea), filterUnit) : Infinity;
+
+      filtered = filtered.filter(p => {
+        const pArea = normalizeArea(Number(p.area), p.area_unit || 'sqft');
+        return pArea >= min && pArea <= max;
+      });
+    }
+
+    setFilteredProperties(filtered);
   };
 
   return (
@@ -56,13 +141,14 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
             </p>
           </div>
 
-          <div className="flex justify-center pt-4">
+          <div className="flex flex-col items-center justify-center pt-4 w-full">
             <button
-              onClick={onNavigateToRequirements}
-              className="bg-[#e2f2f0]/90 backdrop-blur-sm text-[#40a28f] px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-2xl shadow-black/10 hover:bg-white hover:scale-105 transition-all active:scale-[0.98]"
+              onClick={handlePostProperty}
+              className="bg-[#e2f2f0]/90 backdrop-blur-sm text-[#40a28f] px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-2xl shadow-black/10 hover:bg-white hover:scale-105 transition-all active:scale-[0.98] mb-8"
             >
-              Post Your Requirement
+              Post Your Property
             </button>
+            <AdvertisementBanner />
           </div>
         </div>
 
@@ -72,7 +158,7 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
       </div>
 
       {/* Landing Filter Overlay */}
-      <FilterBar />
+      <FilterBar onSearch={handleSearch} />
 
       {/* Property List Section */}
       <section className="max-w-7xl mx-auto px-4 pt-16 pb-24">
@@ -96,9 +182,9 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
             <Loader2 className="h-10 w-10 animate-spin text-[#40a28f]" />
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Loading Properties</p>
           </div>
-        ) : properties.length > 0 ? (
+        ) : filteredProperties.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {properties.map((property) => (
+            {filteredProperties.map((property) => (
               <PropertyCard
                 key={property.id}
                 property={property}
@@ -112,8 +198,14 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
           </div>
         )}
 
-        {properties.length > 0 && <Pagination />}
+        {filteredProperties.length > 0 && <Pagination />}
       </section>
+
+      <AddPropertyModal
+        isOpen={isAddPropertyModalOpen}
+        onClose={() => setIsAddPropertyModalOpen(false)}
+        onSuccess={handlePropertySuccess}
+      />
     </main>
   );
 };

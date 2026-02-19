@@ -67,8 +67,8 @@ const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <p className="text-lg font-bold text-gray-800">{property.area} sq.ft</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-5">
-              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Dimensions</p>
-              <p className="text-lg font-bold text-gray-800">{property.dimensions}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase mb-1">Frontage</p>
+              <p className="text-lg font-bold text-gray-800">{property.frontage || 'N/A'}</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-5">
               <p className="text-xs font-bold text-gray-400 uppercase mb-1">Purpose</p>

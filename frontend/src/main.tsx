@@ -4,6 +4,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { SiteConfigProvider } from './contexts/SiteConfigContext';
+import { ChatProvider } from './contexts/ChatContext';
+import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -21,7 +23,11 @@ root.render(
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <SiteConfigProvider>
-          <App />
+          <AuthProvider>
+            <ChatProvider>
+              <App />
+            </ChatProvider>
+          </AuthProvider>
         </SiteConfigProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>

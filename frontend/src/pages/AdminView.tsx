@@ -1,5 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   User as UserIcon,
@@ -43,13 +43,14 @@ import {
   EyeOff,
   MessageSquare,
   Send,
-  Power
+  Power,
+  Map as MapIcon
 } from 'lucide-react';
 import { propertyService, requirementService, adminService, API_URL } from '@/services/api';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import { Property, Requirement, User } from '@/types/types';
 
-type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Users' | 'Payments' | 'Settings' | 'Moderation' | 'CMS' | 'System';
+type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Users' | 'Payments' | 'Settings' | 'CMS';
 
 interface AdminViewProps {
   onLogout: () => void;
@@ -78,6 +79,37 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageError, setMessageError] = useState('');
+
+  // Property Modal State
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+
+  const openPropertyModal = (property: Property) => {
+    setSelectedProperty(property);
+    setIsPropertyModalOpen(true);
+  };
+
+  const closePropertyModal = () => {
+    setIsPropertyModalOpen(false);
+    setSelectedProperty(null);
+  };
+
+  // Requirement Modal State
+  const [isRequirementModalOpen, setIsRequirementModalOpen] = useState(false);
+  const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
+
+  const [reqFilter, setReqFilter] = useState<'all' | 'pending' | 'active'>('all');
+  const [listingFilter, setListingFilter] = useState<'all' | 'pending' | 'active'>('all');
+
+  const openRequirementModal = (req: Requirement) => {
+    setSelectedRequirement(req);
+    setIsRequirementModalOpen(true);
+  };
+
+  const closeRequirementModal = () => {
+    setIsRequirementModalOpen(false);
+    setSelectedRequirement(null);
+  };
 
   useEffect(() => {
     setLocalConfig(config);
@@ -252,10 +284,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     }
   };
 
-  const handleDeleteRequirement = async (id: string | number) => {
+  const handleDeleteRequirement = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this requirement?')) {
       try {
         await requirementService.delete(id.toString());
+        closeRequirementModal(); // Close modal if open
         fetchData();
       } catch (error) {
         console.error('Failed to delete requirement:', error);
@@ -295,18 +328,30 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     }
   };
 
-  // Filtered lists for search
-  const filteredProperties = properties.filter(p =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.owner?.name?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filtered lists for search and tabs
+  const filteredProperties = properties.filter(p => {
+    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.owner?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const filteredRequirements = requirements.filter(r =>
-    r.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (r.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+    if (!matchesSearch) return false;
+
+    if (listingFilter === 'pending') return !p.is_verified;
+    if (listingFilter === 'active') return p.is_active;
+    return true;
+  });
+
+  const filteredRequirements = requirements.filter(r => {
+    const matchesSearch = r.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (reqFilter === 'pending') return !r.is_verified;
+    if (reqFilter === 'active') return r.is_active;
+    return true;
+  });
 
   const pendingProperties = properties.filter(p => !p.is_verified);
   const pendingRequirements = requirements.filter(r => !r.is_verified);
@@ -314,7 +359,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
   // Compute recent activity from real data
   const recentActivity = [
     ...properties.slice(0, 5).map(p => ({
+      id: p.id,
       icon: Home,
+      type: 'property',
       title: `New Property: ${p.title}`,
       time: new Date(p.created_at || Date.now()).toLocaleTimeString(),
       rawDate: p.created_at,
@@ -322,7 +369,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
       color: 'bg-emerald-50 text-emerald-600'
     })),
     ...requirements.slice(0, 5).map(r => ({
+      id: r.id,
       icon: Search,
+      type: 'requirement',
       title: `New Requirement: ${r.type} in ${r.location}`,
       time: new Date(r.created_at || Date.now()).toLocaleTimeString(),
       rawDate: r.created_at,
@@ -330,7 +379,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
       color: 'bg-blue-50 text-blue-600'
     })),
     ...payments.slice(0, 5).map(pay => ({
+      id: pay.id,
       icon: CreditCard,
+      type: 'payment',
       title: `Payment: ${pay.plan}`,
       time: new Date(pay.created_at || Date.now()).toLocaleTimeString(),
       rawDate: pay.created_at,
@@ -344,11 +395,44 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
   }).slice(0, 8);
 
   // Stats for the overview
+  // Stats for the overview
   const stats = [
-    { label: 'Total Users', value: users.length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%' },
-    { label: 'Properties', value: properties.length.toString(), icon: Home, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%' },
-    { label: 'Pending Approval', value: (pendingProperties.length + pendingRequirements.length).toString(), icon: ShieldAlert, color: 'text-orange-600', bg: 'bg-orange-50', trend: 'Needs Action' },
-    { label: 'Total Revenue', value: `₹${(dbStats?.revenue || 0).toLocaleString('en-IN')}`, icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50', trend: 'Live' },
+    {
+      label: 'Total Users',
+      value: users.length.toString(),
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+      trend: '+12%',
+      onClick: () => setActiveTab('Users')
+    },
+    {
+      label: 'Properties',
+      value: properties.length.toString(),
+      icon: Home,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
+      trend: '+5%',
+      onClick: () => { setActiveTab('Listings'); setListingFilter('all'); }
+    },
+    {
+      label: 'Pending Approval',
+      value: (pendingProperties.length + pendingRequirements.length).toString(),
+      icon: ShieldAlert,
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
+      trend: 'Needs Action',
+      onClick: () => { setActiveTab('Listings'); setListingFilter('pending'); }
+    },
+    {
+      label: 'Total Revenue',
+      value: `₹${(dbStats?.revenue || 0).toLocaleString('en-IN')}`,
+      icon: CreditCard,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+      trend: 'Live',
+      onClick: () => setActiveTab('Payments')
+    },
   ];
 
   const renderContent = () => {
@@ -365,90 +449,6 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     }
 
     switch (activeTab) {
-      case 'Moderation':
-        return (
-          <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            <div className="bg-gradient-to-r from-orange-50 to-white p-8 rounded-[32px] border border-orange-100/50">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-orange-100 rounded-2xl">
-                  <ShieldAlert className="h-6 w-6 text-orange-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Content Moderation</h2>
-                  <p className="text-sm text-gray-500 font-medium">Review and verify new listings and requirements</p>
-                </div>
-              </div>
-
-              {/* Grid for pending items */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Properties */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Pending Properties ({pendingProperties.length})</h3>
-                  <div className="space-y-3">
-                    {pendingProperties.length > 0 ? pendingProperties.map(p => (
-                      <div key={p.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-50 rounded-2xl overflow-hidden border border-gray-100">
-                            <img src={p.imageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'} className="w-full h-full object-cover" alt="" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-800">{p.title}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{p.owner?.name || 'User'} • {p.location}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleToggleVerification(p.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors">
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
-                          <button className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="py-8 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Pending Properties</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Requirements */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Pending Requirements ({pendingRequirements.length})</h3>
-                  <div className="space-y-3">
-                    {pendingRequirements.length > 0 ? pendingRequirements.map(r => (
-                      <div key={r.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                            <Search className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-800">{r.purpose === 'Buy' ? 'Buying' : 'Renting'} {r.type}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{r.user?.name || 'Visitor'} • {r.location}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleToggleRequirementVerification(r.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors">
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => handleDeleteRequirement(r.id)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="py-8 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Pending Requirements</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
       case 'Listings':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -457,16 +457,38 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                 <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Property Management</h2>
                 <p className="text-sm text-gray-500 font-medium">Review and manage site-wide listings</p>
               </div>
-              <div className="flex gap-3">
-                <div className="relative">
-                  <Search className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by title, owner..."
-                    className="pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] w-80 shadow-sm transition-all"
-                  />
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-100 p-1 rounded-xl flex items-center">
+                  <button
+                    onClick={() => setListingFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listingFilter === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setListingFilter('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listingFilter === 'pending' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    Pending ({pendingProperties.length})
+                  </button>
+                  <button
+                    onClick={() => setListingFilter('active')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${listingFilter === 'active' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    Active
+                  </button>
+                </div>
+                <div className="flex gap-3">
+                  <div className="relative">
+                    <Search className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by title, owner..."
+                      className="pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] w-80 shadow-sm transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -477,6 +499,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                   <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
                     <tr>
                       <th className="px-8 py-5">Property Details</th>
+                      <th className="px-8 py-5">Posted By</th>
                       <th className="px-8 py-5">Owner Info</th>
                       <th className="px-8 py-5">Status</th>
                       <th className="px-8 py-5 text-center">Badges</th>
@@ -501,6 +524,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${p.posted_as === 'Owner' ? 'bg-purple-50 text-purple-600' : p.posted_as === 'Broker' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                            {p.posted_as || 'Owner'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
                           <div>
                             <p className="text-sm font-bold text-gray-700">{p.owner?.name || 'Generic User'}</p>
                             <p className="text-[10px] font-bold text-gray-400">{p.owner?.email || 'No email'}</p>
@@ -523,10 +551,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => handleToggleActive(p.id)} className={`p-2 rounded-xl transition-colors ${p.is_active ? 'text-gray-400 hover:text-gray-600' : 'text-[#40a28f] hover:bg-[#40a28f]/5'}`}>
-                              {p.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <button onClick={() => openPropertyModal(p)} className="p-2 text-[#40a28f] hover:bg-[#40a28f]/5 rounded-xl transition-all" title="View Property">
+                              <Eye className="h-4 w-4" />
                             </button>
-                            <button onClick={() => handleDeleteProperty(p.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
+                            <button onClick={() => handleToggleActive(p.id)} className={`p-2 rounded-xl transition-colors ${p.is_active ? 'text-gray-400 hover:text-gray-600' : 'text-[#40a28f] hover:bg-[#40a28f]/5'}`} title={p.is_active ? 'Deactivate' : 'Activate'}>
+                              {p.is_active ? <EyeOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                            </button>
+                            <button onClick={() => handleDeleteProperty(p.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Delete Property">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -553,15 +584,37 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                 <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">User Requirements</h2>
                 <p className="text-sm text-gray-500 font-medium">High intent property-seeking traffic</p>
               </div>
-              <div className="relative">
-                <Search className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search location, name..."
-                  className="pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] w-80 shadow-sm transition-all"
-                />
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-100 p-1 rounded-xl flex items-center">
+                  <button
+                    onClick={() => setReqFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reqFilter === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setReqFilter('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reqFilter === 'pending' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    Pending ({pendingRequirements.length})
+                  </button>
+                  <button
+                    onClick={() => setReqFilter('active')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reqFilter === 'active' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    Active
+                  </button>
+                </div>
+                <div className="relative">
+                  <Search className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search location, name..."
+                    className="pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] w-80 shadow-sm transition-all"
+                  />
+                </div>
               </div>
             </div>
 
@@ -614,15 +667,18 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => handleToggleRequirementActive(r.id)} className={`p-2 rounded-xl transition-colors ${r.is_active ? 'text-gray-400 hover:text-gray-600' : 'text-[#40a28f] hover:bg-[#40a28f]/5'}`}>
-                              {r.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <button onClick={() => openRequirementModal(r)} className="p-2 text-[#40a28f] hover:bg-[#40a28f]/5 rounded-xl transition-all" title="View Requirement">
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleToggleRequirementActive(r.id)} className={`p-2 rounded-xl transition-colors ${r.is_active ? 'text-gray-400 hover:text-gray-600' : 'text-[#40a28f] hover:bg-[#40a28f]/5'}`} title={r.is_active ? 'Deactivate' : 'Activate'}>
+                              {r.is_active ? <EyeOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                             </button>
                             {!r.is_verified && (
                               <button onClick={() => handleToggleRequirementVerification(r.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors">
                                 <CheckCircle className="h-4 w-4" />
                               </button>
                             )}
-                            <button onClick={() => handleDeleteRequirement(r.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
+                            <button onClick={() => handleDeleteRequirement(Number(r.id))} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -661,6 +717,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     <tr>
                       <th className="px-6 py-4">User</th>
                       <th className="px-6 py-4">Role</th>
+                      <th className="px-6 py-4">Badge</th>
                       <th className="px-6 py-4">Joined</th>
                       <th className="px-6 py-4 text-center">Status</th>
                       <th className="px-6 py-4 text-right">Actions</th>
@@ -683,12 +740,63 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         <td className="px-6 py-4">
                           <select
                             value={u.role}
-                            onChange={(e) => adminService.updateUserRole(u.id, e.target.value).then(fetchData)}
+                            onChange={async (e) => {
+                              try {
+                                const newRole = e.target.value;
+                                // Optimistic update
+                                setUsers(prev => prev.map(user =>
+                                  user.id === u.id ? { ...user, role: newRole as any } : user
+                                ));
+
+                                await adminService.updateUserRole(u.id, newRole);
+                                alert('Role updated successfully!');
+                                await fetchData(true);
+                              } catch (err) {
+                                console.error('Failed to update role:', err);
+                                alert('Failed to update role. Check console for details.');
+                                await fetchData(true); // Revert to server state
+                              }
+                            }}
                             className="bg-white border border-gray-300 text-gray-700 text-xs rounded-lg focus:ring-[#40a28f] focus:border-[#40a28f] block w-full p-2.5 shadow-sm"
                           >
                             <option value="seeker">Seeker</option>
                             <option value="owner">Owner</option>
+                            <option value="developer">Developer</option>
                             <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={u.badge || 'User'}
+                            onChange={async (e) => {
+                              try {
+                                const newBadge = e.target.value;
+                                // Optimistic update
+                                setUsers(prev => prev.map(user =>
+                                  user.id === u.id ? { ...user, badge: newBadge } : user
+                                ));
+
+                                await adminService.updateUserBadge(u.id, newBadge);
+                                alert('Badge updated successfully!');
+                                await fetchData(true);
+                              } catch (err) {
+                                console.error('Failed to update badge:', err);
+                                alert('Failed to update badge. Check console for details.');
+                                await fetchData(true); // Revert
+                              }
+                            }}
+                            className={`bg-white border border-gray-300 text-[10px] font-black uppercase tracking-widest rounded-lg focus:ring-[#40a28f] focus:border-[#40a28f] block w-full p-2.5 shadow-sm 
+                              ${u.badge === 'Verified Broker' ? 'text-blue-600' :
+                                u.badge === 'Verified User' ? 'text-emerald-600' :
+                                  u.badge === 'Verified Builder' ? 'text-purple-600' :
+                                    u.badge === 'Developer' ? 'text-indigo-600' :
+                                      'text-gray-500'}`}
+                          >
+                            <option value="User">User</option>
+                            <option value="Verified User">Verified User</option>
+                            <option value="Verified Broker">Verified Broker</option>
+                            <option value="Verified Builder">Verified Builder</option>
+                            <option value="Developer">Developer</option>
                           </select>
                         </td>
                         <td className="px-6 py-4 text-gray-600">
@@ -729,15 +837,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     ))}
                     {users.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                           No users found.
                         </td>
                       </tr>
                     )}
                   </tbody>
-                </table>
-              </div>
-            </div>
+                </table >
+              </div >
+            </div >
           </div >
         );
 
@@ -839,48 +947,6 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
             </div>
 
             <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-8">
-              <div className="flex items-start gap-4 pb-8 border-b border-gray-100">
-                <div className="p-3 bg-[#40a28f]/10 rounded-lg text-[#40a28f]">
-                  <Globe className="h-6 w-6" />
-                </div>
-                <div className="flex-1 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">General Configuration</h3>
-                    <p className="text-sm text-gray-500">Basic platform information and SEO settings</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Application Name</label>
-                      <input
-                        type="text"
-                        value={localConfig.site_name || ''}
-                        onChange={(e) => updateLocalConfig('site_name', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Support Email</label>
-                      <input
-                        type="email"
-                        value={localConfig.support_email || ''}
-                        onChange={(e) => updateLocalConfig('support_email', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm"
-                      />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Site Description</label>
-                      <textarea
-                        rows={3}
-                        value={localConfig.site_description || ''}
-                        onChange={(e) => updateLocalConfig('site_description', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-sm resize-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex items-start gap-4">
                 <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
                   <CreditCard className="h-6 w-6" />
@@ -1180,7 +1246,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {stats.map((s, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                <button
+                  key={i}
+                  onClick={s.onClick}
+                  className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all text-left w-full hover:scale-[1.02] active:scale-95 group"
+                >
                   <div className="flex items-center justify-between mb-4">
                     <div className={`p-2 rounded-lg ${s.bg}`}>
                       <s.icon className={`h-5 w-5 ${s.color}`} />
@@ -1190,10 +1260,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{s.value}</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 group-hover:text-[#40a28f] transition-colors">{s.value}</h3>
                     <p className="text-sm text-gray-500 font-medium">{s.label}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -1205,16 +1275,36 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                   <button className="text-sm text-[#40a28f] font-medium hover:underline">View All</button>
                 </div>
                 <div className="space-y-6">
-                  {recentActivity.length > 0 ? recentActivity.map((item, idx) => (
-                    <div key={idx} className="flex gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.color}`}>
-                        <item.icon className="h-5 w-5" />
+                  {recentActivity.length > 0 ? recentActivity.map((item: any, idx) => (
+                    <div key={idx} className="flex items-center justify-between group">
+                      <div className="flex gap-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${item.color}`}>
+                          <item.icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 group-hover:text-[#40a28f] transition-colors">{item.title}</p>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{item.user}</p>
+                          <p className="text-[10px] text-gray-400 mt-1 font-medium">{item.time}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{item.title}</p>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{item.user}</p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">{item.time}</p>
-                      </div>
+                      {item.type !== 'payment' && (
+                        <button
+                          onClick={() => {
+                            if (item.type === 'property') {
+                              const p = properties.find(prop => prop.id === item.id);
+                              if (p) {
+                                openPropertyModal(p);
+                                return;
+                              }
+                            }
+                            window.open(`/${item.type === 'property' ? 'properties' : 'requirements'}/${item.id}`, '_blank');
+                          }}
+                          className="p-2 opacity-0 group-hover:opacity-100 bg-gray-50 text-gray-400 hover:text-[#40a28f] rounded-lg transition-all"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   )) : (
                     <div className="py-10 text-center text-gray-400 text-sm">No recent activity detected.</div>
@@ -1227,7 +1317,10 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Quick Actions</h3>
                 <div className="space-y-3">
                   <button
-                    onClick={() => setActiveTab('Moderation')}
+                    onClick={() => {
+                      setActiveTab('Listings');
+                      setListingFilter('pending');
+                    }}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-lg hover:bg-white hover:border-[#40a28f] hover:shadow-sm transition-all group"
                   >
                     <div className="flex items-center gap-3">
@@ -1291,15 +1384,11 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
             {[
               { id: 'Overview', icon: LayoutDashboard },
               { id: 'CMS', icon: Palette },
-              { id: 'Moderation', icon: ShieldCheck },
               { id: 'Listings', icon: Building2 },
               { id: 'Requirements', icon: ClipboardList },
               { id: 'Users', icon: Users },
               { id: 'Payments', icon: CreditCard },
-              { id: 'Payments', icon: CreditCard },
-              { id: 'CMS', icon: Palette },
               { id: 'Settings', icon: Settings },
-              { id: 'System', icon: Power },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1424,6 +1513,278 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Property Details Modal */}
+      {isPropertyModalOpen && selectedProperty && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={closePropertyModal}></div>
+          <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl ring-1 ring-gray-900/5 overflow-hidden animate-in fade-in zoom-in-95 duration-300 my-8">
+            <div className="relative h-64 sm:h-80 bg-gray-100">
+              <img
+                src={selectedProperty.imageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=1200'}
+                className="w-full h-full object-cover"
+                alt={selectedProperty.title}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+              <button
+                onClick={closePropertyModal}
+                className="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur-md hover:bg-white/40 text-white rounded-full transition-all"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              <div className="absolute bottom-6 left-6 right-6 text-white">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
+                  <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest bg-white/20 backdrop-blur-md`}>
+                    {selectedProperty.status} ({selectedProperty.type})
+                  </span>
+                  {selectedProperty.is_verified && (
+                    <span className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest bg-blue-500/80 backdrop-blur-md text-white">
+                      <ShieldCheck className="h-3 w-3" /> Verified
+                    </span>
+                  )}
+                  {selectedProperty.is_featured && (
+                    <span className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest bg-yellow-500/80 backdrop-blur-md text-white">
+                      <Star className="h-3 w-3 fill-current" /> Featured
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-2">{selectedProperty.title}</h2>
+                <div className="flex items-center gap-2 text-white/80 font-medium">
+                  <MapIcon className="h-4 w-4" />
+                  {selectedProperty.location} {selectedProperty.district ? `, ${selectedProperty.district}` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-10 grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+              <div className="md:col-span-2 space-y-8">
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#40a28f]" /> Description
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{selectedProperty.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Area Size</p>
+                    <p className="text-xl font-black text-gray-900">{selectedProperty.area} <span className="text-sm font-bold text-gray-500 uppercase">{selectedProperty.area_unit}</span></p>
+                  </div>
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Price</p>
+                    <p className="text-xl font-black text-[#40a28f]">₹{selectedProperty.price.toLocaleString('en-IN')}</p>
+                    {selectedProperty.is_negotiable && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Negotiable</span>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                  {selectedProperty.street_name && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Street / Colony</p>
+                      <p className="font-semibold text-gray-800">{selectedProperty.street_name}</p>
+                    </div>
+                  )}
+                  {selectedProperty.village && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Village / Ward</p>
+                      <p className="font-semibold text-gray-800">{selectedProperty.village}</p>
+                    </div>
+                  )}
+                  {selectedProperty.landmark && (
+                    <div className="col-span-2">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Landmark</p>
+                      <p className="font-semibold text-gray-800">{selectedProperty.landmark}</p>
+                    </div>
+                  )}
+                </div>
+
+                {selectedProperty.google_map_url && (
+                  <div>
+                    <a
+                      href={selectedProperty.google_map_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-3 bg-[#40a28f]/10 text-[#40a28f] hover:bg-[#40a28f] hover:text-white rounded-xl font-bold transition-all text-sm"
+                    >
+                      <MapIcon className="h-4 w-4" /> View on Google Maps
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <div className="p-6 bg-white border border-gray-200 rounded-2xl shadow-sm">
+                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Posted By</h3>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">
+                      {selectedProperty.owner?.name?.[0] || 'U'}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">{selectedProperty.owner?.name || 'Unknown'}</p>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedProperty.posted_as || 'Owner'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Phone</span>
+                      <span className="font-mono font-medium text-gray-800">{selectedProperty.owner?.phone || 'Hidden'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Email</span>
+                      <span className="font-medium text-gray-800 truncate max-w-[150px]" title={selectedProperty.owner?.email}>{selectedProperty.owner?.email || 'Hidden'}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      window.location.href = `tel:${selectedProperty.owner?.phone}`;
+                    }}
+                    className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Contact Owner
+                  </button>
+                </div>
+
+                <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        handleToggleVerification(selectedProperty.id);
+                        closePropertyModal();
+                      }}
+                      className="w-full py-2.5 px-4 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-xl text-sm font-semibold transition-all flex items-center justify-between group"
+                    >
+                      <span>{selectedProperty.is_verified ? 'Revoke Verification' : 'Verify Property'}</span>
+                      <ShieldCheck className="h-4 w-4 text-gray-300 group-hover:text-blue-500" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleToggleFeatured(selectedProperty.id);
+                        closePropertyModal();
+                      }}
+                      className="w-full py-2.5 px-4 bg-white border border-gray-200 hover:border-yellow-500 hover:text-yellow-600 rounded-xl text-sm font-semibold transition-all flex items-center justify-between group"
+                    >
+                      <span>{selectedProperty.is_featured ? 'Remove Featured' : 'Mark Featured'}</span>
+                      <Star className="h-4 w-4 text-gray-300 group-hover:text-yellow-500" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDeleteProperty(selectedProperty.id);
+                        closePropertyModal();
+                      }}
+                      className="w-full py-2.5 px-4 bg-white border border-gray-200 hover:border-red-500 hover:text-red-600 rounded-xl text-sm font-semibold transition-all flex items-center justify-between group"
+                    >
+                      <span>Delete Listing</span>
+                      <Trash2 className="h-4 w-4 text-gray-300 group-hover:text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Requirement Details Modal */}
+      {isRequirementModalOpen && selectedRequirement && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={closeRequirementModal}></div>
+          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl ring-1 ring-gray-900/5 overflow-hidden animate-in fade-in zoom-in-95 duration-300 my-8">
+            <div className="px-8 py-8 border-b border-gray-100 bg-[#40a28f] text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Search className="w-40 h-40 transform rotate-12" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-xs font-black uppercase tracking-widest">
+                    {selectedRequirement.purpose === 'Buy' ? 'Buying' : 'Renting'} Requirement
+                  </span>
+                  {!selectedRequirement.is_verified && (
+                    <span className="px-3 py-1 bg-white text-[#40a28f] rounded-lg text-xs font-black uppercase tracking-widest">
+                      New Request
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-3xl font-black tracking-tight">{selectedRequirement.type}</h2>
+                <p className="text-white/80 font-medium mt-2 flex items-center gap-2">
+                  <MapIcon className="h-4 w-4" /> {selectedRequirement.location}
+                </p>
+              </div>
+              <button
+                onClick={closeRequirementModal}
+                className="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur-md hover:bg-white/40 text-white rounded-full transition-all z-20"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Budget Range</p>
+                  <p className="text-xl font-black text-[#40a28f]">
+                    ₹{selectedRequirement.minBudget.toLocaleString()} - {selectedRequirement.maxBudget.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Area Range</p>
+                  <p className="text-xl font-black text-gray-900">
+                    {selectedRequirement.minArea} - {selectedRequirement.maxArea} Sq Ft
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Description / Preferences</h3>
+                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  {selectedRequirement.description || "No specific preferences provided."}
+                </p>
+              </div>
+
+              <div className="border-t border-gray-100 pt-6">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Requester Information</h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">
+                    {selectedRequirement.user?.name?.[0] || 'U'}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">{selectedRequirement.user?.name || 'Visitor'}</p>
+                    <p className="text-xs text-gray-500">{selectedRequirement.user?.email || 'No email provided'}</p>
+                  </div>
+                  {selectedRequirement.contact_phone && (
+                    <a href={`tel:${selectedRequirement.contact_phone}`} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-gray-800 transition-colors">
+                      {selectedRequirement.contact_phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    handleToggleRequirementVerification(selectedRequirement.id);
+                    closeRequirementModal();
+                  }}
+                  className="flex-1 py-3 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {selectedRequirement.is_verified ? 'Revoke Verification' : 'Verify Request'}
+                </button>
+                <button
+                  onClick={() => {
+                    handleDeleteRequirement(Number(selectedRequirement.id));
+                  }}
+                  className="flex-1 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete Request
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,19 +1,26 @@
 import React from 'react';
-import { MapPin, Ruler, Maximize, MessageSquare, Bookmark, Phone, Mail, IndianRupee, ShieldCheck } from 'lucide-react';
+import { MapPin, Ruler, Maximize, MessageSquare, Bookmark, Phone, Mail, IndianRupee, ShieldCheck, ClipboardList } from 'lucide-react';
 import { Requirement } from '@/types/types';
 import { requirementService, bookmarkService } from '@/services/api';
+import { useNavigate } from 'react-router-dom';
+import { useChat } from '@/contexts/ChatContext';
+import { useAuth } from '@/contexts/AuthContext';
+import ContactModal from './ContactModal';
 
 interface RequirementCardProps {
   requirement: Requirement;
 }
 
 const RequirementCard: React.FC<RequirementCardProps> = ({ requirement }) => {
+  const navigate = useNavigate();
   const [isBookmarked, setIsBookmarked] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const { createThread } = useChat();
+  const { isAuthenticated, openLogin } = useAuth();
 
   React.useEffect(() => {
     const checkStatus = async () => {
-      if (requirement.id) {
+      if (requirement.id && isAuthenticated) {
         try {
           const status = await bookmarkService.isBookmarked(requirement.id, 'requirement');
           setIsBookmarked(status);
@@ -23,11 +30,16 @@ const RequirementCard: React.FC<RequirementCardProps> = ({ requirement }) => {
       }
     };
     checkStatus();
-  }, [requirement.id]);
+  }, [requirement.id, isAuthenticated]);
 
   const toggleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!requirement.id || loading) return;
+
+    if (!isAuthenticated) {
+      openLogin();
+      return;
+    }
 
     setLoading(true);
     try {
@@ -39,8 +51,38 @@ const RequirementCard: React.FC<RequirementCardProps> = ({ requirement }) => {
       setLoading(false);
     }
   };
+
+  const handleCardClick = () => {
+    navigate(`/requirements/${requirement.id}`);
+  };
+
+  const [showContactModal, setShowContactModal] = React.useState(false);
+
+  const handleContactSeeker = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      openLogin();
+      return;
+    }
+    if (!requirement.user_id) return;
+    setShowContactModal(true);
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (!requirement.user_id) return;
+    try {
+      const thread = await createThread(Number(requirement.user_id), undefined, message);
+      navigate(`/messages/${thread.id}`);
+    } catch (err) {
+      console.error("Failed to initiate contact", err);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 group flex flex-col h-full uppercase-none">
+    <div
+      onClick={handleCardClick}
+      className="bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 group flex flex-col h-full cursor-pointer uppercase-none"
+    >
       {/* Header Badges */}
       <div className="p-6 pb-4 flex items-center justify-between">
         <div className="flex gap-2">
@@ -85,6 +127,14 @@ const RequirementCard: React.FC<RequirementCardProps> = ({ requirement }) => {
         <p className="text-sm text-gray-500 leading-relaxed line-clamp-3 italic">
           "{requirement.description || 'Seeking a property matching these strategic parameters in Rajnandgaon...'}"
         </p>
+
+        {/* View Details Hint */}
+        <div className="pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[#40a28f] text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+            View Details <ClipboardList className="h-3 w-3" />
+          </span>
+        </div>
+
       </div>
 
       {/* Footer */}
@@ -98,18 +148,34 @@ const RequirementCard: React.FC<RequirementCardProps> = ({ requirement }) => {
           </div>
         </div>
 
-        <button
-          onClick={toggleBookmark}
-          disabled={loading}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isBookmarked
-            ? 'bg-[#e2f2f0] text-[#40a28f]'
-            : 'bg-white border border-gray-200 text-gray-400 hover:border-[#40a28f] hover:text-[#40a28f] hover:bg-gray-50'
-            }`}
-        >
-          <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-[#40a28f]' : ''}`} />
-          {isBookmarked ? 'Saved' : 'Save'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleContactSeeker}
+            className="p-2.5 bg-[#e2f2f0] text-[#40a28f] rounded-xl hover:bg-[#d4e9e6] transition-all"
+            title="Chat with Seeker"
+          >
+            <MessageSquare className="h-5 w-5" />
+          </button>
+          <button
+            onClick={toggleBookmark}
+            disabled={loading}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isBookmarked
+              ? 'bg-[#e2f2f0] text-[#40a28f]'
+              : 'bg-white border border-gray-200 text-gray-400 hover:border-[#40a28f] hover:text-[#40a28f] hover:bg-gray-50'
+              }`}
+          >
+            <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-[#40a28f]' : ''}`} />
+            {isBookmarked ? 'Saved' : 'Save'}
+          </button>
+        </div>
       </div>
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        recipientName={requirement.contact_name || requirement.user?.name || "Interested Buyer"}
+        propertyName={`Requirement for ${requirement.type} in ${requirement.location}`}
+        onSend={handleSendMessage}
+      />
     </div>
   );
 };

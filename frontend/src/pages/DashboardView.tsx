@@ -4,8 +4,8 @@ import {
   Plus, User, AlertTriangle, LayoutGrid, Search, Loader2, LogOut,
   TrendingUp, MessageSquare, CheckCircle, Eye, Phone, Calendar
 } from 'lucide-react';
-import { propertyService, requirementService, adminService, paymentService, notificationService, bookmarkService } from '@/services/api';
-import { Property, Requirement } from '@/types/types';
+import { propertyService, requirementService, adminService, paymentService, notificationService, bookmarkService, userService } from '@/services/api';
+import { Property, Requirement, User as UserType } from '@/types/types';
 import PropertyCard from '@/components/PropertyCard';
 import AddPropertyModal from '@/components/AddPropertyModal';
 import AddRequirementModal from '@/components/AddRequirementModal';
@@ -30,10 +30,17 @@ const DashboardView: React.FC = () => {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [profile, setProfile] = useState<UserType | null>(null);
   const [paymentStats, setPaymentStats] = useState<any>(null);
   const [shortlistCount, setShortlistCount] = useState(0);
   const [shortlistedProperties, setShortlistedProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // States for editable profile fields in settings
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCompanyName, setEditCompanyName] = useState('');
+
 
   // Profile Completeness State
   const [completionPercentage, setCompletionPercentage] = useState(80);
@@ -50,7 +57,8 @@ const DashboardView: React.FC = () => {
       const fetchTasks: Promise<any>[] = [
         notificationService.getAll(),
         requirementService.getAll(),
-        propertyService.getAll() // for shortlist matching
+        propertyService.getAll(), // for shortlist matching
+        userService.getProfile()
       ];
 
       // Fetch listings for everyone
@@ -65,7 +73,18 @@ const DashboardView: React.FC = () => {
       setNotifications(results[0]);
       setRequirements(results[1].slice(0, 5));
       const allProperties = results[2];
-      setProperties(results[3] || []);
+      const userProfile = results[3];
+      setProfile(userProfile);
+
+      // Initialize edit states
+      if (userProfile) {
+        setEditName(userProfile.name || '');
+        setEditPhone(userProfile.phone || '');
+        setEditCompanyName(userProfile.company_name || '');
+      }
+
+      setProperties(results[4] || []);
+
 
       if (userRole === 'owner' || userRole === 'admin') {
         const payRes = results[4] || [];
@@ -140,6 +159,17 @@ const DashboardView: React.FC = () => {
   const renderSidebar = () => (
     <div className="hidden lg:flex flex-col w-72 bg-white border-r border-gray-100 min-h-screen fixed left-0 top-16 z-30 pt-8 px-6">
       <div className="space-y-8">
+        {/* User Info */}
+        <div className="flex items-center gap-3 px-2">
+          <div className="h-10 w-10 bg-[#40a28f] rounded-full flex items-center justify-center text-white font-black uppercase shadow-lg shadow-[#40a28f]/20">
+            {profile?.name?.charAt(0) || <User className="h-5 w-5" />}
+          </div>
+          <div className="overflow-hidden">
+            <h3 className="text-sm font-black text-gray-800 line-clamp-1 truncate">{profile?.name || 'User'}</h3>
+            <p className="text-[10px] font-black text-[#40a28f] uppercase tracking-widest truncate">{profile?.role || 'Member'}</p>
+          </div>
+        </div>
+
         {/* Profile Completion Widget */}
         <div className="bg-gradient-to-br from-[#40a28f]/5 to-white border border-[#40a28f]/20 rounded-2xl p-4 relative overflow-hidden">
           <div className="relative z-10">
@@ -200,7 +230,7 @@ const DashboardView: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-[#40a28f] p-10 rounded-[40px] text-white relative overflow-hidden shadow-xl shadow-[#40a28f]/20">
         <div className="space-y-2 relative z-10">
           <h1 className="text-4xl font-black uppercase tracking-tighter">
-            {userRole === 'owner' ? 'Owner Dashboard' : 'User Dashboard'}
+            Welcome, {profile?.name || (userRole === 'owner' ? 'Owner' : 'User')}
           </h1>
           <p className="text-white/80 font-medium tracking-wide">
             {userRole === 'owner' ? 'Track your property performance & leads.' : 'Track your property search journey.'}
@@ -274,41 +304,12 @@ const DashboardView: React.FC = () => {
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="bg-white rounded-[40px] border border-gray-100 p-10 space-y-8">
-              <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase border-b border-gray-50 pb-6">Recommended For You</h3>
-              {/* Mock Recommendation */}
-              <div className="flex gap-4 items-center bg-gray-50 p-4 rounded-2xl">
-                <div className="h-16 w-16 bg-gray-200 rounded-xl"></div>
-                <div>
-                  <p className="font-bold text-gray-800">New 3BHK in Durg</p>
-                  <p className="text-xs text-gray-400">Matches your recent search patterns</p>
-                </div>
-                <button className="ml-auto text-[#40a28f] font-bold text-sm">View</button>
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Sidebar Area (1 col) - Market Intelligence */}
         <div className="space-y-8">
-          <div className="bg-white rounded-[40px] border border-gray-100 p-8 space-y-6">
-            <div className="flex items-center gap-3 mb-2">
-              <TrendingUp className="h-6 w-6 text-[#40a28f]" />
-              <h3 className="text-lg font-black text-gray-800 tracking-tight uppercase">Market Data</h3>
-            </div>
-            <div className="space-y-6">
-              {requirements.slice(0, 4).map((req) => (
-                <div key={req.id} className="relative pl-6 border-l-2 border-gray-100">
-                  <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-[#40a28f]"></div>
-                  <p className="text-sm font-bold text-gray-700">{req.type} in <span className="text-[#40a28f]">{req.location}</span></p>
-                  <p className="text-xs text-gray-400 mt-1 line-clamp-1">{req.description || 'Looking for property...'}</p>
-                  <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest mt-2 block">{req.minBudget ? `₹${(req.minBudget / 100000).toFixed(1)}L+` : 'Budget: Flexible'}</span>
-                </div>
-              ))}
-              {requirements.length === 0 && <p className="text-gray-400 text-sm italic">No active requirements.</p>}
-            </div>
-          </div>
+
 
           {/* Premium Upsell Card */}
           {userRole === 'owner' && (
@@ -418,6 +419,24 @@ const DashboardView: React.FC = () => {
     </div>
   );
 
+  const handleUpdateProfile = async () => {
+    try {
+      setLoading(true);
+      await userService.updateProfile({
+        name: editName,
+        phone: editPhone,
+        company_name: editCompanyName
+      });
+      alert('Profile updated successfully!');
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      alert('Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderSettings = () => (
     <div className="space-y-10 max-w-3xl animate-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -458,21 +477,55 @@ const DashboardView: React.FC = () => {
         <div className="flex items-center gap-4 border-b border-gray-50 pb-8">
           <div className="w-16 h-16 bg-[#e2f2f0] rounded-full flex items-center justify-center text-[#40a28f]"><User className="h-8 w-8" /></div>
           <div>
-            <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight">Profile Details</h3>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Public Information</p>
+            <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight">{profile?.name || 'User'}</h3>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">{profile?.role || 'Seeker'}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
-            <input type="email" placeholder="email@example.com" disabled className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-500" />
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Full Name"
+              className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-800 focus:ring-[#40a28f] focus:border-[#40a28f] outline-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email (Read-only)</label>
+            <input type="email" value={profile?.email || ''} disabled className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-400" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone</label>
-            <input type="tel" placeholder="+91 98..." className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-800 focus:ring-[#40a28f]" />
+            <input
+              type="tel"
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+              placeholder="+91 98..."
+              className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-800 focus:ring-[#40a28f] focus:border-[#40a28f] outline-none"
+            />
           </div>
+          {profile?.role === 'developer' && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Company Name</label>
+              <input
+                type="text"
+                value={editCompanyName}
+                onChange={(e) => setEditCompanyName(e.target.value)}
+                placeholder="Company Name"
+                className="w-full bg-gray-50 border-gray-100 rounded-2xl py-3 px-5 text-sm font-bold text-gray-800 focus:ring-[#40a28f] focus:border-[#40a28f] outline-none"
+              />
+            </div>
+          )}
         </div>
-        <button className="bg-[#40a28f] text-white px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-[#40a28f]/20">Update Profile</button>
+        <button
+          onClick={handleUpdateProfile}
+          disabled={loading}
+          className="bg-[#40a28f] text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-[#40a28f]/20 hover:bg-[#358a7a] transition-all disabled:opacity-50"
+        >
+          {loading ? 'Updating...' : 'Update Profile'}
+        </button>
       </div>
 
       <div className="bg-white rounded-[40px] border border-gray-100 p-10 space-y-8 shadow-sm">

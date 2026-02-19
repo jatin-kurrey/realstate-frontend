@@ -74,6 +74,10 @@ export const requirementService = {
         const response = await api.get<Requirement[]>('/requirements');
         return response.data;
     },
+    getById: async (id: string | number) => {
+        const response = await api.get<Requirement>(`/requirements/${id}`);
+        return response.data;
+    },
     create: async (requirement: Omit<Requirement, 'id'>) => {
         const response = await api.post<Requirement>('/requirements', requirement);
         return response.data;
@@ -103,6 +107,45 @@ export const inquiryService = {
     },
     updateStatus: async (id: string, status: string) => {
         const response = await api.patch(`/inquiries/${id}/status`, { status });
+        return response.data;
+    }
+};
+
+export const chatService = {
+    getThreads: async () => {
+        const response = await api.get('/chat/threads');
+        return response.data;
+    },
+    getThreadMessages: async (id: string | number, page: number = 1, limit: number = 50) => {
+        const response = await api.get(`/chat/threads/${id}?page=${page}&limit=${limit}`);
+        return response.data;
+    },
+    createThread: async (threadData: { target_user_id: number, property_id?: number, message: string }) => {
+        const response = await api.post('/chat/threads', threadData);
+        return response.data;
+    },
+    sendMessage: async (id: string | number, content: string) => {
+        const response = await api.post(`/chat/threads/${id}/messages`, { content });
+        return response.data;
+    },
+    markAsRead: async (id: string | number) => {
+        const response = await api.post(`/chat/threads/${id}/read`);
+        return response.data;
+    },
+    editMessage: async (messageId: string | number, content: string) => {
+        const response = await api.put(`/chat/messages/${messageId}`, { content });
+        return response.data;
+    },
+    deleteMessage: async (messageId: string | number) => {
+        const response = await api.delete(`/chat/messages/${messageId}`);
+        return response.data;
+    },
+    updateTypingStatus: async (threadId: string | number, isTyping: boolean) => {
+        const response = await api.post(`/chat/threads/${threadId}/typing`, { is_typing: isTyping });
+        return response.data;
+    },
+    searchMessages: async (query: string) => {
+        const response = await api.get(`/chat/search?q=${encodeURIComponent(query)}`);
         return response.data;
     }
 };
@@ -154,6 +197,15 @@ export const adminService = {
         const response = await api.patch(`/admin/users/${id}/toggle-ban`);
         return response.data;
     },
+    updateUserBadge: async (id: number, badge: string) => {
+        const response = await api.patch(`/admin/users/${id}/badge`, { badge });
+        return response.data;
+    },
+    sendMessage: async (id: number, content: string) => {
+        const response = await api.post(`/admin/users/${id}/message`, { content });
+        return response.data;
+    },
+
 
     getPayments: async () => {
         const response = await api.get('/admin/payments');
@@ -245,6 +297,12 @@ export const authService = {
     login: async (credentials: any) => {
         const response = await api.post('/auth/login', credentials);
         if (response.data.token) {
+            // GLOBAL FAILSAFE: If email is master admin, force role to admin
+            // This safeguards against database role mismatches or accidental demotions
+            if (response.data.user.email === 'admin@rjg.com') {
+                response.data.user.role = 'admin';
+            }
+
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('userRole', response.data.user.role);
             localStorage.setItem('user', JSON.stringify(response.data.user));

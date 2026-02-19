@@ -24,6 +24,8 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
         maxArea: '',
         description: '',
         contactMethod: 'In-app Messaging',
+        contact_name: '',
+        contact_phone: '',
     });
 
     if (!isOpen) return null;
@@ -59,6 +61,8 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                 maxArea: Number(formData.maxArea),
                 description: formData.description,
                 contactMethod: formData.contactMethod,
+                contact_name: formData.contact_name,
+                contact_phone: formData.contact_phone,
             });
             setIsSuccess(true);
             if (onSuccess) onSuccess();
@@ -76,6 +80,8 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                     maxArea: '',
                     description: '',
                     contactMethod: 'In-app Messaging',
+                    contact_name: '',
+                    contact_phone: '',
                 });
             }, 2000);
         } catch (err: any) {
@@ -239,6 +245,32 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                                     className="w-full bg-white border-2 border-gray-100 rounded-[24px] py-5 px-6 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm resize-none"
                                 />
                             </div>
+
+                            {/* Contact Details Section */}
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Information</label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Contact Name"
+                                            value={formData.contact_name}
+                                            onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <input
+                                            type="tel"
+                                            placeholder="Contact Phone"
+                                            value={formData.contact_phone}
+                                            onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Preference</label>
                                 <div className="relative">

@@ -11,7 +11,6 @@ import MyListingsView from './pages/MyListingsView';
 import PaymentsView from './pages/PaymentsView';
 import AccountView from './pages/AccountView';
 import AboutView from './pages/AboutView';
-import ContactView from './pages/ContactView';
 import ResetPasswordView from './pages/ResetPasswordView';
 import NotFoundView from './pages/NotFoundView';
 import AdminView from './pages/AdminView';
@@ -20,16 +19,19 @@ import DashboardView from './pages/DashboardView';
 import LoginModal from './components/LoginModal';
 import SignUpModal from './components/SignUpModal';
 import MyListView from './pages/MyListView';
+import { useAuth } from './contexts/AuthContext';
 
 import PropertyDetailsView from './pages/PropertyDetailsView';
+import RequirementDetailsView from './pages/RequirementDetailsView';
+import MessagesView from './pages/MessagesView';
 import GodMode from './pages/GodMode/GodMode';
 
 const App: React.FC = () => {
   const { config, loading } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
+  const { isLoginModalOpen, isSignUpModalOpen, openLogin, openSignUp, closeModals } = useAuth();
+
   const [userRole, setUserRole] = useState<'seeker' | 'owner' | 'admin' | null>(() => {
     return localStorage.getItem('userRole') as 'seeker' | 'owner' | 'admin' | null;
   });
@@ -48,26 +50,16 @@ const App: React.FC = () => {
           location.pathname === '/payments' ? 'Payments' :
             location.pathname === '/account' ? 'Account' :
               location.pathname === '/mylist' ? 'MyList' :
-                location.pathname === '/about' ? 'About' :
-                  location.pathname === '/contact' ? 'Contact' : 'Browse';
-
-  const openLogin = () => {
-    setIsSignUpModalOpen(false);
-    setIsLoginModalOpen(true);
-  };
-
-  const openSignUp = () => {
-    setIsLoginModalOpen(false);
-    setIsSignUpModalOpen(true);
-  };
+                location.pathname === '/contact' ? 'About' : 'Browse';
 
   const handleAdminLogin = async (email: string, password: string) => {
     try {
       const data = await authService.login({ email, password });
-      if (data.user.role === 'admin') {
+      // Check for admin role OR master admin email (failsafe for accidental role changes)
+      if (data.user.role === 'admin' || email === 'admin@rjg.com') {
         setIsAdminAuthenticated(true);
         sessionStorage.setItem('isAdminAuthenticated', 'true');
-        localStorage.setItem('userRole', 'admin');
+        localStorage.setItem('userRole', 'admin'); // Force admin role even if DB says otherwise
         localStorage.setItem('token', data.token); // Ensure token is also synced
         navigate('/admin');
         window.location.reload(); // Hard reload to refresh navbar state consistently
@@ -102,7 +94,8 @@ const App: React.FC = () => {
       case 'Account': navigate('/account'); break;
       case 'MyList': navigate('/mylist'); break;
       case 'About': navigate('/about'); break;
-      case 'Contact': navigate('/contact'); break;
+      case 'Contact': navigate('/about'); break;
+      case 'Messages': navigate('/messages'); break;
       case 'Admin': navigate('/admin'); break;
       default: navigate('/');
     }
@@ -120,18 +113,20 @@ const App: React.FC = () => {
     return <GodMode />;
   }
 
-  if (config.maintenance_mode === 'true') {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  if (config.maintenance_mode === 'true' && !isLocal) {
     return (
       <div className="min-h-screen bg-[#fcfdfd]">
         <MaintenancePage onOpenLogin={openLogin} />
         <LoginModal
           isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
+          onClose={closeModals}
           onSwitchToSignUp={openSignUp}
         />
         <SignUpModal
           isOpen={isSignUpModalOpen}
-          onClose={() => setIsSignUpModalOpen(false)}
+          onClose={closeModals}
           onSwitchToLogin={openLogin}
         />
       </div>
@@ -177,8 +172,11 @@ const App: React.FC = () => {
           <Route path="/" element={<BrowsePropertiesView onNavigateToRequirements={() => navigate('/requirements')} onOpenLogin={openLogin} />} />
           <Route path="/properties/:id" element={<PropertyDetailsView />} />
           <Route path="/requirements" element={<RequirementsView />} />
+          <Route path="/requirements/:id" element={<RequirementDetailsView />} />
+          <Route path="/messages" element={<MessagesView />} />
+          <Route path="/messages/:id" element={<MessagesView />} />
           <Route path="/about" element={<AboutView />} />
-          <Route path="/contact" element={<ContactView />} />
+          <Route path="/contact" element={<AboutView />} />
           <Route path="/dashboard" element={<DashboardView />} />
           <Route path="/listings" element={<Navigate to="/dashboard" replace />} />
           <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
@@ -197,13 +195,13 @@ const App: React.FC = () => {
 
       <LoginModal
         isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        onClose={closeModals}
         onSwitchToSignUp={openSignUp}
       />
 
       <SignUpModal
         isOpen={isSignUpModalOpen}
-        onClose={() => setIsSignUpModalOpen(false)}
+        onClose={closeModals}
         onSwitchToLogin={openLogin}
       />
 

@@ -1,5 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { X, ChevronDown, Map, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { propertyService, API_URL } from '@/services/api';
 import { Property } from '@/types/types';
@@ -20,14 +20,25 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
   const [formData, setFormData] = useState({
     title: '',
     status: 'Sale',
-    type: 'Residential',
+    type: 'Residential Building',
     area: '',
+    area_unit: 'sqft',
     dimensions: '',
+    frontage: '',
     description: '',
     price: '',
+    street_name: '',
+    village: '',
+    revenue_inspector_circle: '',
+    tehsil: '',
+    district: '',
+    google_map_url: '',
+    land_use: '',
     location: '',
+    distance_from_main_location: '',
     landmark: '',
     is_negotiable: false,
+    posted_as: 'Owner',
     imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800'
   });
 
@@ -36,28 +47,50 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
       setFormData({
         title: property.title || '',
         status: property.status || 'Sale',
-        type: property.type || 'Residential',
+        type: property.type || 'Residential Building',
         area: property.area?.toString() || '',
+        area_unit: property.area_unit || 'sqft',
         dimensions: property.dimensions || '',
+        frontage: property.frontage || '',
         description: property.description || '',
         price: property.price?.toString() || '',
+        street_name: property.street_name || '',
+        village: property.village || '',
+        revenue_inspector_circle: property.revenue_inspector_circle || '',
+        tehsil: property.tehsil || '',
+        district: property.district || '',
+        google_map_url: property.google_map_url || '',
+        land_use: property.land_use || '',
         location: property.location || '',
+        distance_from_main_location: property.distance_from_main_location || '',
         landmark: property.landmark || '',
         is_negotiable: property.is_negotiable || false,
+        posted_as: property.posted_as || 'Owner',
         imageUrl: property.imageUrl || ''
       });
     } else {
       setFormData({
         title: '',
         status: 'Sale',
-        type: 'Residential',
+        type: 'Residential Building',
         area: '',
+        area_unit: 'sqft',
         dimensions: '',
+        frontage: '',
         description: '',
         price: '',
+        street_name: '',
+        village: '',
+        revenue_inspector_circle: '',
+        tehsil: '',
+        district: '',
+        google_map_url: '',
+        land_use: '',
         location: '',
+        distance_from_main_location: '',
         landmark: '',
         is_negotiable: false,
+        posted_as: 'Owner',
         imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800'
       });
     }
@@ -67,7 +100,8 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setSelectedFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+      const filesArray = Array.from(e.target.files) as File[];
+      setSelectedFiles(prev => [...prev, ...filesArray]);
     }
   };
 
@@ -106,13 +140,16 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
 
     try {
       const imageUrls = await uploadImages();
+      const locationString = `${formData.street_name}, ${formData.village}`;
 
       const payload = {
         ...formData,
+        location: locationString,
         area: parseFloat(formData.area),
         price: parseFloat(formData.price),
         status: formData.status as any,
         type: formData.type as any,
+        area_unit: formData.area_unit as 'sqft' | 'acre',
         imageUrl: imageUrls && imageUrls.length > 0 ? imageUrls[0] : formData.imageUrl,
         images: imageUrls ? imageUrls.join(',') : (property?.images || '')
       };
@@ -194,73 +231,198 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
           <section className="space-y-6">
             <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Listing Details</h3>
             <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Property Title</label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    placeholder="e.g. Luxury 3BHK Villa with Garden"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 placeholder:font-medium"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">I want to</label>
+                  <div className="relative">
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600"
+                    >
+                      <option value="Sale">Sell</option>
+                      <option value="Rent">Rent</option>
+                    </select>
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Property Type</label>
+                  <div className="relative">
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleChange}
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600"
+                    >
+                      <option value="Residential Building">Residential Building</option>
+                      <option value="Commercial Building">Commercial Building</option>
+                      <option value="Plot">Plot</option>
+                    </select>
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Posted By</label>
+                  <div className="relative">
+                    <select
+                      name="posted_as"
+                      value={formData.posted_as}
+                      onChange={handleChange}
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600"
+                    >
+                      <option value="Owner">Owner</option>
+                      <option value="Broker">Broker</option>
+                      <option value="Builder">Builder</option>
+                    </select>
+                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Land Use</label>
+                  <input
+                    type="text"
+                    name="land_use"
+                    value={formData.land_use}
+                    onChange={handleChange}
+                    placeholder="e.g. Residential, Mixed Use"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Area</label>
+                  <div className="flex gap-2">
+                    <input type="number" name="area" value={formData.area} onChange={handleChange} placeholder="1200"
+                      className="flex-1 bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
+                    <select name="area_unit" value={formData.area_unit} onChange={handleChange}
+                      className="w-24 bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-2 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600">
+                      <option value="sqft">Sq.ft</option>
+                      <option value="acre">Acre</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Frontage</label>
+                  <input type="text" name="frontage" value={formData.frontage} onChange={handleChange} placeholder="e.g. 40ft"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dimensions</label>
+                  <input type="text" name="dimensions" value={formData.dimensions} onChange={handleChange} placeholder="e.g. 50x30 ft"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Street Name</label>
+                    <input type="text" name="street_name" value={formData.street_name} onChange={handleChange} placeholder="e.g. Main Road, Ward 4"
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village/Locality</label>
+                    <input type="text" name="village" value={formData.village} onChange={handleChange} placeholder="e.g. Rajnandgaon"
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dist. from Main Location</label>
+                  <input type="text" name="distance_from_main_location" value={formData.distance_from_main_location} onChange={handleChange} placeholder="e.g. 300M from Temple"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RI Circle</label>
+                  <input type="text" name="revenue_inspector_circle" value={formData.revenue_inspector_circle} onChange={handleChange} placeholder="RI Circle"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehsil</label>
+                  <input type="text" name="tehsil" value={formData.tehsil} onChange={handleChange} placeholder="Tehsil"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">District</label>
+                  <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="District"
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                </div>
+              </div>
+
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Title</label>
-                <input type="text" name="title" value={formData.title} onChange={handleChange} placeholder="e.g., Spacious 3BHK near Market"
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Purpose</label>
-                  <div className="relative">
-                    <select name="status" value={formData.status} onChange={handleChange}
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 cursor-pointer">
-                      <option value="Sale">For Sale</option>
-                      <option value="Rent">For Rent</option>
-                    </select>
-                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Type</label>
-                  <div className="relative">
-                    <select name="type" value={formData.type} onChange={handleChange}
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 cursor-pointer">
-                      <option value="Residential">Residential</option>
-                      <option value="Commercial">Commercial</option>
-                      <option value="Land">Land / Plot</option>
-                    </select>
-                    <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                  </div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Google Map URL</label>
+                <div className="relative">
+                  <Map className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input type="url" name="google_map_url" value={formData.google_map_url} onChange={handleChange} placeholder="https://maps.google.com/..."
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 pl-12 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
                 </div>
               </div>
 
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Area (Sq Ft)</label>
-                  <input type="number" name="area" value={formData.area} onChange={handleChange} placeholder="1200"
-                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
-                </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Price (₹)</label>
-                  <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="25,00,000"
-                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 font-mono tracking-tight" required />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleChange}
+                      placeholder="e.g. 7500000"
+                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 pl-12 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600"
+                      required
+                    />
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                  </div>
                   <div className="flex items-center gap-2 mt-2 ml-1">
                     <input type="checkbox" name="is_negotiable" id="is_negotiable" checked={formData.is_negotiable} onChange={handleChange}
                       className="w-4 h-4 text-[#40a28f] border-gray-300 rounded focus:ring-[#40a28f]" />
                     <label htmlFor="is_negotiable" className="text-[10px] font-black text-gray-500 uppercase tracking-widest cursor-pointer">Price is Negotiable</label>
                   </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Location / Locality</label>
-                  <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g. Kacheri Chowk"
-                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Landmark (Public)</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Landmark</label>
                   <input type="text" name="landmark" value={formData.landmark} onChange={handleChange} placeholder="e.g. Near City Mall"
                     className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
-                <textarea name="description" value={formData.description} onChange={handleChange} rows={4} placeholder="Tell us more about your property..."
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 resize-none" required />
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description (Highlight key features)</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={4}
+                  placeholder="Highlight the best things about this property..."
+                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 resize-none"
+                  required
+                />
               </div>
             </div>
           </section>
@@ -288,7 +450,7 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2f2f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #40a28f20; }
       `}</style>
-    </div>
+    </div >
   );
 };
 
