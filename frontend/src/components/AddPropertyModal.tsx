@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { X, ChevronDown, Map, Upload, Loader2, Image as ImageIcon, ShieldCheck } from 'lucide-react';
-import { propertyService, API_URL } from '@/services/api';
-import { Property } from '@/types/types';
+import { propertyService, locationService, API_URL } from '@/services/api';
+import { Property, LocationMetadata } from '@/types/types';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -20,6 +20,23 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const { config } = useSiteConfig();
   const { isPremium, userRole } = useAuth();
+  const [locations, setLocations] = useState<LocationMetadata[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      setLocationLoading(true);
+      try {
+        const data = await locationService.getAll();
+        setLocations(data);
+      } catch (err) {
+        console.error('Failed to fetch locations:', err);
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+    if (isOpen) fetchLocations();
+  }, [isOpen]);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -406,18 +423,48 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">District</label>
-                    <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="District"
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                    <div className="relative">
+                      <select name="district" value={formData.district} onChange={handleChange}
+                        className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600">
+                        <option value="">Select District</option>
+                        {locations.filter(l => l.type === 'district').map(l => (
+                          <option key={l.id} value={l.name}>{l.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehsil</label>
-                    <input type="text" name="tehsil" value={formData.tehsil} onChange={handleChange} placeholder="Tehsil"
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                    <div className="relative">
+                      <select name="tehsil" value={formData.tehsil} onChange={handleChange}
+                        disabled={!formData.district}
+                        className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 disabled:opacity-50">
+                        <option value="">Select Tehsil</option>
+                        {locations.filter(l => l.type === 'tehsil' && 
+                          l.parent_id === locations.find(p => p.name === formData.district)?.id
+                        ).map(l => (
+                          <option key={l.id} value={l.name}>{l.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RI Circle</label>
-                    <input type="text" name="revenue_inspector_circle" value={formData.revenue_inspector_circle} onChange={handleChange} placeholder="RI Circle"
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" />
+                    <div className="relative">
+                      <select name="revenue_inspector_circle" value={formData.revenue_inspector_circle} onChange={handleChange}
+                        disabled={!formData.tehsil}
+                        className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 disabled:opacity-50">
+                        <option value="">Select RI Circle</option>
+                        {locations.filter(l => l.type === 'ri_circle' && 
+                          l.parent_id === locations.find(p => p.name === formData.tehsil)?.id
+                        ).map(l => (
+                          <option key={l.id} value={l.name}>{l.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
 
@@ -425,8 +472,19 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, pr
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village / Locality</label>
-                    <input type="text" name="village" value={formData.village} onChange={handleChange} placeholder="e.g. Rajnandgaon"
-                      className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600" required />
+                    <div className="relative">
+                      <select name="village" value={formData.village} onChange={handleChange}
+                        disabled={!formData.revenue_inspector_circle}
+                        className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 disabled:opacity-50" required>
+                        <option value="">Select Village</option>
+                        {locations.filter(l => l.type === 'village' && 
+                          l.parent_id === locations.find(p => p.name === formData.revenue_inspector_circle)?.id
+                        ).map(l => (
+                          <option key={l.id} value={l.name}>{l.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Street Name</label>

@@ -165,7 +165,13 @@ const RequirementsView: React.FC = () => {
                          req.location?.toLowerCase().includes(appliedFilters.searchQuery.toLowerCase()) ||
                          req.description?.toLowerCase().includes(appliedFilters.searchQuery.toLowerCase());
 
-      return matchPurpose && matchType && matchMinBudget && matchMaxBudget && matchSearch;
+      const matchDistrict = !appliedFilters.district || req.district === appliedFilters.district;
+      const matchTehsil = !appliedFilters.tehsil || req.tehsil === appliedFilters.tehsil;
+      const matchRICircle = !appliedFilters.riCircle || req.revenue_inspector_circle === appliedFilters.riCircle;
+      const matchVillage = !appliedFilters.village || req.village === appliedFilters.village;
+
+      return matchPurpose && matchType && matchMinBudget && matchMaxBudget && matchSearch && 
+             matchDistrict && matchTehsil && matchRICircle && matchVillage;
     }).sort((a, b) => {
       if (sortBy === 'Budget: Low to High') return Number(a.minBudget) - Number(b.minBudget);
       if (sortBy === 'Budget: High to Low') return Number(b.minBudget) - Number(a.minBudget);

@@ -695,19 +695,29 @@ const DashboardView: React.FC = () => {
         <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
           <div className="flex-grow">
             {/* Mobile Tab Bar */}
-            <div className="lg:hidden flex overflow-x-auto gap-2 p-4 no-scrollbar bg-white sticky top-20 z-20 border-b border-gray-100">
-              {[
-                { id: 'overview', label: 'Overview', show: true },
-                { id: 'assets', label: 'Properties', show: config['dashboard_my_properties'] === 'true' },
-                { id: 'mylist', label: 'Saved', show: config['dashboard_saved_list'] === 'true' },
-                { id: 'requirements', label: 'Needs', show: config['dashboard_my_requirements'] === 'true' },
-                { id: 'finance', label: 'Mortgage', show: config['dashboard_mortgage'] === 'true' && (userRole === 'owner' || userRole === 'admin') },
-                { id: 'settings', label: 'Settings', show: config['dashboard_settings'] === 'true' }
-              ].filter(t => t.show).map(t => (
-                <button key={t.id} onClick={() => setActiveTab(t.id as Tab)} className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-[#40a28f] text-white' : 'bg-gray-50 text-gray-400'}`}>
-                  {t.label}
-                </button>
-              ))}
+            <div className="lg:hidden flex overflow-x-auto gap-2 p-4 no-scrollbar bg-white sticky top-20 z-20 border-b border-gray-100 shadow-sm">
+              <div className="flex gap-2 min-w-max">
+                {[
+                  { id: 'overview', label: 'Overview', show: true },
+                  { id: 'assets', label: 'Properties', show: config['dashboard_my_properties'] === 'true' },
+                  { id: 'mylist', label: 'Saved', show: config['dashboard_saved_list'] === 'true' },
+                  { id: 'requirements', label: 'Needs', show: config['dashboard_my_requirements'] === 'true' },
+                  { id: 'finance', label: 'Mortgage', show: config['dashboard_mortgage'] === 'true' && (userRole === 'owner' || userRole === 'admin') },
+                  { id: 'settings', label: 'Settings', show: config['dashboard_settings'] === 'true' }
+                ].filter(t => t.show).map(t => (
+                  <button 
+                    key={t.id} 
+                    onClick={() => setActiveTab(t.id as Tab)} 
+                    className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${
+                      activeTab === t.id 
+                        ? 'bg-[#40a28f] text-white border-[#40a28f] shadow-lg shadow-[#40a28f]/20' 
+                        : 'bg-white text-gray-400 border-gray-100'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto">

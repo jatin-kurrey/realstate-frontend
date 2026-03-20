@@ -291,20 +291,45 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onOpenLogin,
       {isMenuOpen && (
         <div className="lg:hidden bg-white border-t border-gray-50 p-6 space-y-6 animate-in slide-in-from-top duration-300">
           <div className="flex flex-col gap-4">
-            {[...mainNavItems.filter(i => i.show), ...serviceItems, ...authItems.filter(i => i.show)].map((item) => (
+            {[...mainNavItems.filter(i => i.show), ...serviceItems].map((item) => (
               <button
                 key={item.value}
                 onClick={() => {
                   onViewChange(item.value);
                   setIsMenuOpen(false);
                 }}
-                className={`text-sm font-black uppercase tracking-widest py-2 ${
-                  currentView === item.value ? 'text-[#40a28f]' : 'text-gray-500'
+                className={`text-sm font-black uppercase tracking-widest py-2 text-left ${
+                  currentView === item.value ? 'text-[#40a28f]' : 'text-gray-500 hover:text-[#40a28f]'
                 }`}
               >
                 {item.label}
               </button>
             ))}
+            
+            {token && (
+              <>
+                <button
+                  onClick={() => { onViewChange('Dashboard'); setIsMenuOpen(false); }}
+                  className="text-sm font-black uppercase tracking-widest py-2 text-[#40a28f] text-left flex items-center gap-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                </button>
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => { onViewChange('Admin'); setIsMenuOpen(false); }}
+                    className="text-sm font-black uppercase tracking-widest py-2 text-gray-500 text-left flex items-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4" /> Admin Panel
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="text-sm font-black uppercase tracking-widest py-2 text-red-500 text-left flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" /> Logout
+                </button>
+              </>
+            )}
           </div>
 
           {!token && (

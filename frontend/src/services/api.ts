@@ -1,5 +1,27 @@
 import axios from 'axios';
-import { Property, Requirement, Advertisement } from '../types/types';
+import { Property, Requirement, Advertisement, LocationMetadata } from '../types/types';
+
+export const locationService = {
+    getAll: async (params?: { type?: string; parent_id?: number | string }) => {
+        const response = await api.get<LocationMetadata[]>('/locations', { params });
+        return response.data;
+    },
+    adminCreate: async (data: Omit<LocationMetadata, 'id'>) => {
+        const response = await api.post<LocationMetadata>('/admin/locations', data);
+        return response.data;
+    },
+    adminUpdate: async (id: number | string, data: Partial<LocationMetadata>) => {
+        const response = await api.put<LocationMetadata>(`/admin/locations/${id}`, data);
+        return response.data;
+    },
+    adminDelete: async (id: number | string) => {
+        await api.delete(`/admin/locations/${id}`);
+    },
+    adminBulkImport: async (data: any[]) => {
+        const response = await api.post('/admin/locations/bulk', data);
+        return response.data;
+    }
+};
 
 const getApiBaseUrl = () => {
     // If it's explicitly set in the env

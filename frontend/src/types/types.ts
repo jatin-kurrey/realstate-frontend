@@ -18,6 +18,7 @@ export interface User {
 
 export interface Property {
   id: string | number;
+  unique_id?: string;
   title: string;
   location: string;
   landmark?: string;
@@ -57,6 +58,7 @@ export interface Property {
 
 export interface Requirement {
   id: string | number;
+  unique_id?: string;
   purpose: 'Buy' | 'Rent' | 'Mortgage';
   type: PropertyType;
   land_use?: string;
@@ -100,4 +102,12 @@ export interface Advertisement {
   created_at?: string;
   updated_at?: string;
   deleted_at?: string;
+}
+export interface LocationMetadata {
+  id: number;
+  type: 'district' | 'tehsil' | 'ri_circle' | 'village';
+  name: string;
+  parent_id?: number;
+  created_at?: string;
+  updated_at?: string;
 }

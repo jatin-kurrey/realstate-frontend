@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   LayoutDashboard,
   User as UserIcon,
@@ -49,14 +50,17 @@ import {
   Landmark,
   Edit,
   ExternalLink,
+  MapPin,
+  Layers,
+  Upload,
 } from 'lucide-react';
-import { propertyService, requirementService, adminService, advertisementService, API_URL, getImageUrl } from '@/services/api';
+import { propertyService, requirementService, adminService, advertisementService, locationService, API_URL, getImageUrl } from '@/services/api';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
-import { Property, Requirement, User, Advertisement } from '@/types/types';
+import { Property, Requirement, User, Advertisement, LocationMetadata } from '@/types/types';
 import AddPropertyModal from '@/components/AddPropertyModal';
 import AddRequirementModal from '@/components/AddRequirementModal';
 
-type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Mortgages' | 'Users' | 'Premium' | 'Advertisements' | 'Settings' | 'CMS' | 'Auctions';
+type AdminTab = 'Overview' | 'Listings' | 'Requirements' | 'Mortgages' | 'Users' | 'Premium' | 'Advertisements' | 'Settings' | 'CMS' | 'Auctions' | 'Locations';
 
 interface AdminViewProps {
   onLogout: () => void;
@@ -99,6 +103,109 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
   // Add/Edit Requirement Modal State
   const [isAddRequirementModalOpen, setIsAddRequirementModalOpen] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState<Requirement | null>(null);
+
+  // Locations State
+  const [locations, setLocations] = useState<LocationMetadata[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationTypeFilter, setLocationTypeFilter] = useState<'district' | 'tehsil' | 'ri_circle' | 'village'>('district');
+  const [locationParentFilter, setLocationParentFilter] = useState<number | ''>('');
+  const [locationForm, setLocationForm] = useState({
+    name: '',
+    type: 'district' as 'district' | 'tehsil' | 'ri_circle' | 'village',
+    parent_id: undefined as number | undefined
+  });
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<LocationMetadata | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchLocations = async () => {
+    setLocationLoading(true);
+    try {
+      const data = await locationService.getAll();
+      setLocations(data);
+    } catch (error) {
+      console.error('Failed to fetch locations:', error);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const bstr = event.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        // Map excel columns to backend expected format
+        // Expected columns: District, Tehsil, RI Circle, Village
+        const formattedData = data.map((row: any) => ({
+          district: row.District || row.district || '',
+          tehsil: row.Tehsil || row.tehsil || '',
+          ri_circle: row['RI Circle'] || row.ri_circle || row.riCircle || '',
+          village: row.Village || row.village || ''
+        })).filter(item => item.district !== '');
+
+        if (formattedData.length === 0) {
+          alert('No valid data found in Excel. Please ensure columns are named District, Tehsil, RI Circle, Village.');
+          return;
+        }
+
+        setLocationLoading(true);
+        await locationService.adminBulkImport(formattedData);
+        await fetchLocations();
+        alert('Bulk import completed successfully!');
+      } catch (err) {
+        console.error('Excel Import Error:', err);
+        alert('Failed to import Excel. Please check the file format.');
+      } finally {
+        setLocationLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Locations') {
+      fetchLocations();
+    }
+  }, [activeTab, locationTypeFilter, locationParentFilter]);
+
+  const handleCreateLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingLocation) {
+        await locationService.adminUpdate(editingLocation.id, locationForm);
+      } else {
+        await locationService.adminCreate(locationForm as any);
+      }
+      setIsLocationModalOpen(false);
+      setEditingLocation(null);
+      setLocationForm({ name: '', type: 'district', parent_id: undefined });
+      fetchLocations();
+    } catch (error) {
+      console.error('Failed to save location:', error);
+      alert('Failed to save location');
+    }
+  };
+
+  const handleDeleteLocation = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this location?')) return;
+    try {
+      await locationService.adminDelete(id);
+      fetchLocations();
+    } catch (error) {
+      console.error('Failed to delete location:', error);
+      alert('Failed to delete location');
+    }
+  };
 
   const openAddPropertyModal = (property?: Property) => {
     setEditingPropertyDetails(property || null);
@@ -608,6 +715,158 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     },
   ];
 
+  const renderLocations = () => {
+    const filteredLocs = locations.filter(l =>
+      l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l.type.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <h2 className="text-2xl font-black text-gray-800 tracking-tight">Administrative Locations</h2>
+            <div className="h-6 w-[1px] bg-gray-200 hidden md:block"></div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Master Data</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleBulkImport} 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={locationLoading}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-emerald-100 text-emerald-600 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-emerald-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import Excel
+            </button>
+            <button 
+              onClick={() => {
+                setEditingLocation(null);
+                setLocationForm({ type: 'district', name: '', parent_id: undefined });
+                setIsLocationModalOpen(true);
+              }}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#40a28f] text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-[#358a7a] transition-all shadow-lg shadow-[#40a28f]/20"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Location
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[
+            { id: 'district', label: 'Districts' },
+            { id: 'tehsil', label: 'Tehsils' },
+            { id: 'ri_circle', label: 'RI Circles' },
+            { id: 'village', label: 'Villages' }
+          ].map((type) => (
+            <div key={type.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{type.label}</p>
+              <p className="text-2xl font-black text-gray-900">
+                {locations.filter(l => l.type === type.id).length}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[300px]">
+            <Search className="h-4 w-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or type..."
+              className="pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] w-full shadow-sm transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-[32px] overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                <tr>
+                  <th className="px-8 py-5">Location Name</th>
+                  <th className="px-8 py-5">Type</th>
+                  <th className="px-8 py-5">Parent Location</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredLocs.map((loc) => (
+                  <tr key={loc.id} className="hover:bg-gray-50/30 transition-colors">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#40a28f]/10 text-[#40a28f] flex items-center justify-center">
+                          <MapPin className="h-5 w-5" />
+                        </div>
+                        <p className="font-bold text-gray-800">{loc.name}</p>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                        loc.type === 'district' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                        loc.type === 'tehsil' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                        loc.type === 'ri_circle' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        'bg-orange-50 text-orange-600 border-orange-100'
+                      }`}>
+                        {loc.type.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="text-sm font-bold text-gray-500">
+                        {loc.parent_id ? locations.find(l => l.id === loc.parent_id)?.name : 'None'}
+                      </p>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingLocation(loc);
+                            setLocationForm({
+                              type: loc.type,
+                              name: loc.name,
+                              parent_id: loc.parent_id
+                            });
+                            setIsLocationModalOpen(true);
+                          }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLocation(loc.id!)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredLocs.length === 0 && (
+              <div className="py-20 text-center">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No locations found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -695,7 +954,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                             </div>
                             <div>
                               <div className="flex items-center gap-2 mb-1">
-                                <p className="font-bold text-gray-800">{p.is_auction ? 'a' : 'p'}{p.id} - {p.title}</p>
+                                <p className="font-bold text-gray-800">{p.unique_id || (p.is_auction ? 'A' : 'P') + p.id} - {p.title}</p>
                                 {p.deleted_at && <span className="bg-red-50 text-red-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">Deleted Record</span>}
                                 {!p.is_verified && <span className="bg-orange-50 text-orange-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest animate-pulse">Pending</span>}
                               </div>
@@ -817,7 +1076,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         <td className="px-8 py-6">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-bold text-gray-800">r{r.id} - {r.purpose === 'Buy' ? 'Buying' : 'Renting'} {r.type}</p>
+                              <p className="font-bold text-gray-800">{r.unique_id || 'R' + r.id} - {r.purpose === 'Buy' ? 'Buying' : 'Renting'} {r.type}</p>
                               {r.deleted_at && <span className="bg-red-50 text-red-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">Historical</span>}
                               {!r.is_verified && <span className="bg-orange-50 text-orange-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest animate-pulse">New</span>}
                             </div>
@@ -2098,6 +2357,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
           </div>
         );
 
+      case 'Locations':
+        return renderLocations();
+
       case 'Overview':
       default:
         return (
@@ -2294,14 +2556,15 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
         </button>
       </div>
 
-      {/* Admin Sidebar Backdrop (Mobile) */}
+      {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[70] transition-opacity"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[75] lg:hidden transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
+      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 w-72 bg-white border-r border-gray-200 z-[80] transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:block
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -2337,6 +2600,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
               { id: 'Premium', label: 'Premium', icon: Crown },
               { id: 'Advertisements', label: 'Advertisements', icon: Image },
               { id: 'Auctions', label: 'Auctions', icon: Gavel },
+              { id: 'Locations', label: 'Manage Locations', icon: MapIcon },
               { id: 'Settings', label: 'Settings', icon: Settings },
             ].map((item) => (
               <button
@@ -2400,7 +2664,95 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
         </div>
       </main >
 
-      {/* Property Details Modal */}
+      {/* Location Modal */}
+      {isLocationModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsLocationModalOpen(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl ring-1 ring-gray-900/5 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                    {editingLocation ? 'Edit Location' : 'Add New Location'}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Hierarchical Data Entry</p>
+                </div>
+                <button onClick={() => setIsLocationModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateLocation} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Location Type</label>
+                  <select
+                    value={locationForm.type}
+                    onChange={(e) => setLocationForm({ ...locationForm, type: e.target.value as any, parent_id: undefined })}
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all"
+                  >
+                    <option value="district">District</option>
+                    <option value="tehsil">Tehsil</option>
+                    <option value="ri_circle">RI Circle</option>
+                    <option value="village">Village</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Location Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={locationForm.name}
+                    onChange={(e) => setLocationForm({ ...locationForm, name: e.target.value })}
+                    placeholder="Enter name (e.g. Raipur, Civil Lines)"
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all"
+                  />
+                </div>
+
+                {locationForm.type !== 'district' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
+                      Parent {locationForm.type === 'tehsil' ? 'District' : 
+                             locationForm.type === 'ri_circle' ? 'Tehsil' : 'RI Circle'}
+                    </label>
+                    <select
+                      required
+                      value={locationForm.parent_id || ''}
+                      onChange={(e) => setLocationForm({ ...locationForm, parent_id: Number(e.target.value) })}
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all"
+                    >
+                      <option value="">Select Parent</option>
+                      {locations.filter(l => 
+                        (locationForm.type === 'tehsil' && l.type === 'district') ||
+                        (locationForm.type === 'ri_circle' && l.type === 'tehsil') ||
+                        (locationForm.type === 'village' && l.type === 'ri_circle')
+                      ).map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(false)}
+                    className="flex-1 py-4 bg-gray-50 text-gray-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-4 bg-[#40a28f] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#358a7a] transition-all shadow-xl shadow-[#40a28f]/20"
+                  >
+                    {editingLocation ? 'Update Location' : 'Save Location'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
       {
         isPropertyModalOpen && selectedProperty && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">

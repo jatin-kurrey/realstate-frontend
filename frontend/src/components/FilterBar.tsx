@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface FilterState {
   searchQuery: string;
   district: string;
-  tehesil: string;
+  tehsil: string;
   riCircle: string;
   village: string;
   purpose: string;
@@ -29,7 +29,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
   const [filters, setFilters] = React.useState<FilterState>({
     searchQuery: '',
     district: '',
-    tehesil: '',
+    tehsil: '',
     riCircle: '',
     village: '',
     purpose: mode === 'mortgage' ? 'Mortgage' : 'All',
@@ -49,6 +49,20 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
 
   const { isPremium, userRole } = useAuth();
   const hasPremiumAccess = isPremium || userRole === 'admin';
+  const [locations, setLocations] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const { locationService } = await import('@/services/api');
+        const data = await locationService.getAll();
+        setLocations(data);
+      } catch (err) {
+        console.error('Failed to fetch locations:', err);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as any;
@@ -70,7 +84,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
     const defaultFilters = {
       searchQuery: '',
       district: '',
-      tehesil: '',
+      tehsil: '',
       riCircle: '',
       village: '',
       purpose: mode === 'mortgage' ? 'Mortgage' : 'All',
@@ -98,7 +112,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
       <div className="bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 border border-gray-100 p-6 md:p-10 space-y-6">
         {/* Main Search Row */}
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative w-full">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
@@ -111,16 +125,16 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
               className="w-full pl-14 pr-4 py-4 md:py-5 bg-gray-50/50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 transition-all text-gray-700 font-medium placeholder:text-gray-400"
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className={`px-6 md:px-8 py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] md:text-xs transition-all border-2 ${showAdvanced ? 'bg-gray-100 border-gray-200 text-gray-700' : 'bg-white border-gray-100 text-gray-500 hover:border-[#40a28f]/30 hover:text-[#40a28f]'}`}
+              className={`w-full sm:flex-1 md:w-auto px-6 md:px-8 py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] md:text-xs transition-all border-2 ${showAdvanced ? 'bg-gray-100 border-gray-200 text-gray-700' : 'bg-white border-gray-100 text-gray-500 hover:border-[#40a28f]/30 hover:text-[#40a28f]'}`}
             >
               Advanced Search
             </button>
             <button
               onClick={handleSearch}
-              className="bg-[#40a28f] text-white px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] md:text-xs hover:bg-[#358a7a] flex items-center justify-center gap-3 shadow-xl shadow-[#40a28f]/20 transition-all active:scale-[0.98]"
+              className="w-full sm:flex-1 md:w-auto bg-[#40a28f] text-white px-8 md:px-10 py-4 md:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] md:text-xs hover:bg-[#358a7a] flex items-center justify-center gap-3 shadow-xl shadow-[#40a28f]/20 transition-all active:scale-[0.98]"
             >
               <Search className="h-4 w-4" />
               Search
@@ -177,23 +191,30 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
                   className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm"
                 >
                   <option value="">Select District</option>
-                  <option value="Rajnandgaon">Rajnandgaon</option>
+                  {locations.filter(l => l.type === 'district').map(l => (
+                    <option key={l.id} value={l.name}>{l.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
             </div>
 
             <div className="space-y-2.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehesil</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehsil</label>
               <div className="relative">
                 <select
-                  name="tehesil"
-                  value={filters.tehesil}
+                  name="tehsil"
+                  value={filters.tehsil}
                   onChange={handleChange}
-                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm"
+                  disabled={!filters.district}
+                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm disabled:opacity-50"
                 >
-                  <option value="">Select Tehesil</option>
-                  <option value="Rajnandgaon">Rajnandgaon</option>
+                  <option value="">Select Tehsil</option>
+                  {locations.filter(l => l.type === 'tehsil' && 
+                    l.parent_id === locations.find(p => p.name === filters.district)?.id
+                  ).map(l => (
+                    <option key={l.id} value={l.name}>{l.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
@@ -206,9 +227,15 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
                   name="riCircle"
                   value={filters.riCircle}
                   onChange={handleChange}
-                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm"
+                  disabled={!filters.tehsil}
+                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm disabled:opacity-50"
                 >
                   <option value="">Select RI</option>
+                  {locations.filter(l => l.type === 'ri_circle' && 
+                    l.parent_id === locations.find(p => p.name === filters.tehsil)?.id
+                  ).map(l => (
+                    <option key={l.id} value={l.name}>{l.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
@@ -221,9 +248,15 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, mode = 'property', init
                   name="village"
                   value={filters.village}
                   onChange={handleChange}
-                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm"
+                  disabled={!filters.riCircle}
+                  className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-700 font-bold text-sm disabled:opacity-50"
                 >
                   <option value="">Select Village</option>
+                  {locations.filter(l => l.type === 'village' && 
+                    l.parent_id === locations.find(p => p.name === filters.riCircle)?.id
+                  ).map(l => (
+                    <option key={l.id} value={l.name}>{l.name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>

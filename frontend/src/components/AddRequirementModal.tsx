@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2, ChevronRight, ChevronLeft, MapPin, IndianRupee, Home, ClipboardList, ChevronDown, CheckCircle2 } from 'lucide-react';
-import { requirementService } from '../services/api';
-import { Requirement } from '../types/types';
+import { requirementService, locationService } from '../services/api';
+import { Requirement, LocationMetadata } from '../types/types';
 
 interface AddRequirementModalProps {
     isOpen: boolean;
@@ -16,6 +16,23 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [locations, setLocations] = useState<LocationMetadata[]>([]);
+    const [locationLoading, setLocationLoading] = useState(false);
+
+    React.useEffect(() => {
+        const fetchLocations = async () => {
+            setLocationLoading(true);
+            try {
+                const data = await locationService.getAll();
+                setLocations(data);
+            } catch (err) {
+                console.error('Failed to fetch locations:', err);
+            } finally {
+                setLocationLoading(false);
+            }
+        };
+        if (isOpen) fetchLocations();
+    }, [isOpen]);
 
     const [formData, setFormData] = useState({
         purpose: requirement?.purpose || defaultPurpose || 'Buy',
@@ -127,13 +144,13 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                 tehsil: formData.tehsil,
                 district: formData.district,
                 landmark: formData.landmark,
-                land_use: formData.land_use,
+                land_use: formData.land_use as any,
                 minArea: Number(formData.minArea),
                 maxArea: Number(formData.maxArea),
-                area_unit: formData.area_unit,
+                area_unit: formData.area_unit as any,
                 expected_rate: formData.expected_rate,
                 description: formData.description,
-                contactMethod: formData.contactMethod,
+                contactMethod: formData.contactMethod as any,
                 contact_name: formData.contact_name,
                 contact_phone: formData.contact_phone,
             };
@@ -329,30 +346,73 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                                             className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village/Locality</label>
-                                        <input type="text" placeholder="Village" value={formData.village}
-                                            onChange={(e) => setFormData({ ...formData, village: e.target.value, location: e.target.value })}
-                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" required />
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">District</label>
+                                        <div className="relative">
+                                            <select
+                                                value={formData.district}
+                                                onChange={(e) => setFormData({ ...formData, district: e.target.value, tehsil: '', revenue_inspector_circle: '', village: '' })}
+                                                className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm"
+                                            >
+                                                <option value="">Select District</option>
+                                                {locations.filter(l => l.type === 'district').map(l => (
+                                                    <option key={l.id} value={l.name}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RI Circle</label>
-                                        <input type="text" placeholder="RI Circle" value={formData.revenue_inspector_circle}
-                                            onChange={(e) => setFormData({ ...formData, revenue_inspector_circle: e.target.value })}
-                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
-                                    </div>
-                                    <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehsil</label>
-                                        <input type="text" placeholder="Tehsil" value={formData.tehsil}
-                                            onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
-                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                        <div className="relative">
+                                            <select
+                                                disabled={!formData.district}
+                                                value={formData.tehsil}
+                                                onChange={(e) => setFormData({ ...formData, tehsil: e.target.value, revenue_inspector_circle: '', village: '' })}
+                                                className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm disabled:opacity-50"
+                                            >
+                                                <option value="">Select Tehsil</option>
+                                                {locations.filter(l => l.type === 'tehsil' && l.parent_id === locations.find(p => p.name === formData.district)?.id).map(l => (
+                                                    <option key={l.id} value={l.name}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">District</label>
-                                        <input type="text" placeholder="District" value={formData.district}
-                                            onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RI Circle</label>
+                                        <div className="relative">
+                                            <select
+                                                disabled={!formData.tehsil}
+                                                value={formData.revenue_inspector_circle}
+                                                onChange={(e) => setFormData({ ...formData, revenue_inspector_circle: e.target.value, village: '' })}
+                                                className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm disabled:opacity-50"
+                                            >
+                                                <option value="">Select RI Circle</option>
+                                                {locations.filter(l => l.type === 'ri_circle' && l.parent_id === locations.find(p => p.name === formData.tehsil)?.id).map(l => (
+                                                    <option key={l.id} value={l.name}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village</label>
+                                        <div className="relative">
+                                            <select
+                                                disabled={!formData.revenue_inspector_circle}
+                                                value={formData.village}
+                                                onChange={(e) => setFormData({ ...formData, village: e.target.value, location: e.target.value })}
+                                                className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm disabled:opacity-50"
+                                            >
+                                                <option value="">Select Village</option>
+                                                {locations.filter(l => l.type === 'village' && l.parent_id === locations.find(p => p.name === formData.revenue_inspector_circle)?.id).map(l => (
+                                                    <option key={l.id} value={l.name}>{l.name}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">

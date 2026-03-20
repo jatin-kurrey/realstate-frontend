@@ -92,6 +92,26 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
       filtered = filtered.filter(p => p.type === filters.type);
     }
 
+    // District
+    if (filters.district) {
+      filtered = filtered.filter(p => p.district === filters.district);
+    }
+
+    // Tehsil
+    if (filters.tehsil) {
+      filtered = filtered.filter(p => p.tehsil === filters.tehsil);
+    }
+
+    // RI Circle
+    if (filters.riCircle) {
+      filtered = filtered.filter(p => p.revenue_inspector_circle === filters.riCircle);
+    }
+
+    // Village
+    if (filters.village) {
+      filtered = filtered.filter(p => p.village === filters.village);
+    }
+
     setFilteredProperties(filtered);
   }, [isPremiumItem]);
 
