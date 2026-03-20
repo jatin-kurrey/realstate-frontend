@@ -19,14 +19,14 @@ import {
     Clock,
     User,
     Info,
-    Building2
+    Building2,
+    Crown
 } from 'lucide-react';
 import LoginModal from '@/components/LoginModal';
 import SignUpModal from '@/components/SignUpModal';
-import ContactModal from '@/components/ContactModal';
-import { useChat } from '@/contexts/ChatContext';
 
 import { useAuth } from '@/contexts/AuthContext';
+import PremiumModal from '@/components/PremiumModal';
 
 const RequirementDetailsView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -35,27 +35,18 @@ const RequirementDetailsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
-    const [showContactModal, setShowContactModal] = useState(false);
-    const { createThread } = useChat();
+    const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+
     const { isAuthenticated, openLogin } = useAuth();
 
     const handleContactSeeker = async () => {
-        if (!isAuthenticated) {
-            openLogin();
+        if (!requirement) return;
+        const phone = requirement.contact_phone || (requirement.user && requirement.user.phone);
+        if (!phone) {
+            alert('Phone number not available for this seeker.');
             return;
         }
-        if (!requirement || !requirement.user_id) return;
-        setShowContactModal(true);
-    };
-
-    const handleSendMessage = async (message: string) => {
-        if (!requirement || !requirement.user_id) return;
-        try {
-            const thread = await createThread(Number(requirement.user_id), undefined, message);
-            navigate(`/messages/${thread.id}`);
-        } catch (err) {
-            console.error("Failed to initiate contact", err);
-        }
+        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}`, '_blank');
     };
 
     useEffect(() => {
@@ -74,9 +65,14 @@ const RequirementDetailsView: React.FC = () => {
                         console.error("Failed to check bookmark status", err);
                     }
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Failed to fetch requirement details:', err);
-                setError('Failed to load requirement details. Please try again later.');
+                if (err.response?.status === 403 || err.response?.data?.isPremium) {
+                    setIsPremiumModalOpen(true);
+                    setError('PREMIUM_CONTENT');
+                } else {
+                    setError('Failed to load requirement details. Please try again later.');
+                }
             } finally {
                 setLoading(false);
             }
@@ -123,6 +119,33 @@ const RequirementDetailsView: React.FC = () => {
             <div className="min-h-screen bg-[#fcfdfd] flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#40a28f]"></div>
                 <p className="mt-4 text-gray-400 font-bold uppercase tracking-widest text-sm">Loading Requirement...</p>
+            </div>
+        );
+    }
+
+    if (error === 'PREMIUM_CONTENT') {
+        return (
+            <div className="min-h-screen bg-[#fcfdfd] flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-emerald-500/10">
+                    <Crown className="h-10 w-10 text-emerald-600" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-800 mb-2 uppercase tracking-tight">Premium Requirement</h2>
+                <p className="text-gray-500 mb-8 max-w-sm font-medium">This is a high-value community requirement. You need an active premium membership to view its full details and contact the seeker.</p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                        onClick={() => setIsPremiumModalOpen(true)}
+                        className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                    >
+                        <Crown className="h-4 w-4" /> Upgrade to Premium
+                    </button>
+                    <button
+                        onClick={() => navigate('/requirements')}
+                        className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all active:scale-95"
+                    >
+                        Keep Browsing
+                    </button>
+                </div>
+                <PremiumModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} />
             </div>
         );
     }
@@ -193,9 +216,17 @@ const RequirementDetailsView: React.FC = () => {
                                         <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
                                             {requirement.type}
                                         </span>
+                                        {requirement.is_premium && (
+                                            <span className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                                                <Crown className="w-2.5 h-2.5 fill-current" /> Premium
+                                            </span>
+                                        )}
                                     </div>
-                                    <h1 className="text-3xl font-black text-gray-800 leading-tight">
+                                    <h1 className="text-3xl font-black text-gray-800 leading-tight flex items-center gap-3">
                                         Requirement for {requirement.type}
+                                        {requirement.is_premium && (
+                                            <Crown className="w-6 h-6 text-emerald-600 fill-current" />
+                                        )}
                                     </h1>
                                     <div className="flex items-center gap-2 text-gray-500 mt-2">
                                         <MapPin className="h-4 w-4 text-[#40a28f]" />
@@ -234,9 +265,9 @@ const RequirementDetailsView: React.FC = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</p>
-                                    <div className="flex items-center gap-2 text-[#40a28f] font-bold">
-                                        <ShieldCheck className="h-4 w-4" />
-                                        <span>{requirement.is_verified ? 'Verified' : 'Active'}</span>
+                                    <div className={`flex items-center gap-2 font-bold ${requirement.is_premium ? 'text-emerald-600' : 'text-[#40a28f]'}`}>
+                                        {requirement.is_premium ? <Crown className="h-4 w-4 fill-current" /> : <ShieldCheck className="h-4 w-4" />}
+                                        <span>{requirement.is_premium ? 'Premium' : requirement.is_verified ? 'Verified' : 'Active'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -296,10 +327,10 @@ const RequirementDetailsView: React.FC = () => {
 
                             <button
                                 onClick={handleContactSeeker}
-                                className="w-full py-4 bg-[#40a28f] hover:bg-[#358a7a] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#40a28f]/20 active:scale-[0.98]"
+                                className="w-full py-4 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#25D366]/20 active:scale-[0.98]"
                             >
                                 <MessageCircle className="h-4 w-4" />
-                                Contact Seeker (Chat)
+                                Contact Seeker (WhatsApp)
                             </button>
                         </div>
 
@@ -313,14 +344,6 @@ const RequirementDetailsView: React.FC = () => {
                 </div>
             </main>
 
-            {/* Contact Modal */}
-            <ContactModal
-                isOpen={showContactModal}
-                onClose={() => setShowContactModal(false)}
-                recipientName={requirement.contact_name || requirement.user?.name || "Interested Buyer"}
-                propertyName={`Requirement for ${requirement.type} in ${requirement.location}`}
-                onSend={handleSendMessage}
-            />
         </div>
     );
 };

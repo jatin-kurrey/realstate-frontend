@@ -84,7 +84,7 @@ const NotificationBell: React.FC = () => {
                                         className={`p-3 sm:p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/80 transition-colors flex gap-2 sm:gap-3 cursor-pointer ${!n.is_read ? 'bg-[#40a28f]/[0.02]' : ''}`}
                                         onClick={() => !n.is_read && handleMarkRead(n.id)}
                                     >
-                                        <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex-shrink-0 flex items-center justify-center ${n.type === 'inquiry' ? 'bg-blue-50 text-blue-500' : 'bg-orange-50 text-orange-500'}`}>
+                                        <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex-shrink-0 flex items-center justify-center ${n.type === 'system' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
                                             <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                         </div>
                                         <div className="space-y-1 min-w-0 flex-1">

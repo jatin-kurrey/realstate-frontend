@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CreditCard, CheckCircle2, XCircle, ShieldCheck, Clock, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldCheck, Clock, Check } from 'lucide-react';
 
 interface ActivateListingModalProps {
     isOpen: boolean;
@@ -55,28 +55,14 @@ const ActivateListingModal: React.FC<ActivateListingModalProps> = ({ isOpen, onC
                         </div>
                     </div>
 
-                    {/* Pricing Tile */}
-                    <div className="bg-[#fcfdfd] border-2 border-[#40a28f] rounded-3xl p-6 flex items-center justify-between relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-2">
-                            <CheckCircle2 className="h-5 w-5 text-[#40a28f]" />
-                        </div>
-                        <div>
-                            <span className="text-[10px] font-black text-[#40a28f] uppercase tracking-[0.2em] block mb-1">Standard Listing Fee</span>
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-gray-800 leading-none tracking-tight">₹100</span>
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">/ 30 Days</span>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Action Buttons */}
                     <div className="pt-2 space-y-3">
                         <button
                             onClick={onActivate}
                             className="w-full bg-[#40a28f] text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-[#40a28f]/20 hover:bg-[#358a7a] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                         >
-                            <CreditCard className="h-4 w-4" />
-                            Proceed to Activation
+                            <ShieldCheck className="h-4 w-4" />
+                            Request Activation
                         </button>
                         <button
                             onClick={onClose}
@@ -89,8 +75,8 @@ const ActivateListingModal: React.FC<ActivateListingModalProps> = ({ isOpen, onC
 
                 {/* Security Footer */}
                 <div className="bg-gray-50/80 p-6 flex items-center justify-center gap-2 border-t border-gray-100">
-                    <XCircle className="h-3 w-3 text-gray-300" />
-                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.3em]">Secure Transactions • No Hidden Costs</span>
+                    <ShieldCheck className="h-3 w-3 text-gray-300" />
+                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.3em]">Professional Grade • Secure Verification</span>
                 </div>
             </div>
         </div>

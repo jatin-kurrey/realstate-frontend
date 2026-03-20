@@ -8,7 +8,6 @@ import MaintenancePage from './components/MaintenancePage';
 import BrowsePropertiesView from './pages/BrowsePropertiesView';
 import RequirementsView from './pages/RequirementsView';
 import MyListingsView from './pages/MyListingsView';
-import PaymentsView from './pages/PaymentsView';
 import AccountView from './pages/AccountView';
 import AboutView from './pages/AboutView';
 import ResetPasswordView from './pages/ResetPasswordView';
@@ -16,21 +15,34 @@ import NotFoundView from './pages/NotFoundView';
 import AdminView from './pages/AdminView';
 import AdminLogin from './pages/AdminLogin';
 import DashboardView from './pages/DashboardView';
+import MyListView from './pages/MyListView';
+import AuctionPropertiesView from './pages/AuctionPropertiesView';
+import SDVCalculatorView from './pages/SDVCalculatorView';
+import MortgageView from './pages/MortgageView';
+import MortgageCalculatorView from './pages/MortgageCalculatorView';
+import { useAuth } from './contexts/AuthContext';
 import LoginModal from './components/LoginModal';
 import SignUpModal from './components/SignUpModal';
-import MyListView from './pages/MyListView';
-import { useAuth } from './contexts/AuthContext';
 
 import PropertyDetailsView from './pages/PropertyDetailsView';
 import RequirementDetailsView from './pages/RequirementDetailsView';
-import MessagesView from './pages/MessagesView';
+import MortgageDetailsView from './pages/MortgageDetailsView';
+import AuctionDetailView from './pages/AuctionDetailView';
 import GodMode from './pages/GodMode/GodMode';
+import PremiumModal from './components/PremiumModal';
 
 const App: React.FC = () => {
   const { config, loading } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoginModalOpen, isSignUpModalOpen, openLogin, openSignUp, closeModals } = useAuth();
+  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleOpenPremium = () => setIsPremiumModalOpen(true);
+    window.addEventListener('openPremiumModal', handleOpenPremium);
+    return () => window.removeEventListener('openPremiumModal', handleOpenPremium);
+  }, []);
 
   const [userRole, setUserRole] = useState<'seeker' | 'owner' | 'admin' | null>(() => {
     return localStorage.getItem('userRole') as 'seeker' | 'owner' | 'admin' | null;
@@ -47,9 +59,12 @@ const App: React.FC = () => {
     location.pathname === '/requirements' ? 'Requirements' :
       location.pathname === '/dashboard' ? 'Dashboard' :
         location.pathname === '/listings' ? 'MyListings' :
-          location.pathname === '/payments' ? 'Payments' :
             location.pathname === '/account' ? 'Account' :
               location.pathname === '/mylist' ? 'MyList' :
+                location.pathname === '/auctions' ? 'Auctions' :
+                location.pathname === '/sdv-calculator' ? 'SDV' :
+                location.pathname === '/mortgage' ? 'Mortgage' :
+                location.pathname === '/mortgage-calculator' ? 'Mortgage Calculator' :
                 location.pathname === '/contact' ? 'About' : 'Browse';
 
   const handleAdminLogin = async (email: string, password: string) => {
@@ -90,12 +105,14 @@ const App: React.FC = () => {
       case 'Requirements': navigate('/requirements'); break;
       case 'Dashboard': navigate('/dashboard'); break;
       case 'MyListings': navigate('/listings'); break;
-      case 'Payments': navigate('/payments'); break;
       case 'Account': navigate('/account'); break;
       case 'MyList': navigate('/mylist'); break;
       case 'About': navigate('/about'); break;
       case 'Contact': navigate('/about'); break;
-      case 'Messages': navigate('/messages'); break;
+      case 'Auctions': navigate('/auctions'); break;
+      case 'SDV': navigate('/sdv-calculator'); break;
+      case 'Mortgage': navigate('/mortgage'); break;
+      case 'Mortgage Calculator': navigate('/mortgage-calculator'); break;
       case 'Admin': navigate('/admin'); break;
       default: navigate('/');
     }
@@ -115,7 +132,7 @@ const App: React.FC = () => {
 
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  if (config.maintenance_mode === 'true' && !isLocal) {
+  if (config.maintenance_mode === 'true' && !isAdminAuthenticated) {
     return (
       <div className="min-h-screen bg-[#fcfdfd]">
         <MaintenancePage onOpenLogin={openLogin} />
@@ -173,16 +190,20 @@ const App: React.FC = () => {
           <Route path="/properties/:id" element={<PropertyDetailsView />} />
           <Route path="/requirements" element={<RequirementsView />} />
           <Route path="/requirements/:id" element={<RequirementDetailsView />} />
-          <Route path="/messages" element={<MessagesView />} />
-          <Route path="/messages/:id" element={<MessagesView />} />
+          <Route path="/mortgage/:id" element={<MortgageDetailsView />} />
+          <Route path="/auction/:id" element={<AuctionDetailView />} />
           <Route path="/about" element={<AboutView />} />
           <Route path="/contact" element={<AboutView />} />
           <Route path="/dashboard" element={<DashboardView />} />
           <Route path="/listings" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
           <Route path="/account" element={<Navigate to="/dashboard" replace />} />
           <Route path="/mylist" element={<Navigate to="/dashboard" replace />} />
           <Route path="/reset-password" element={<ResetPasswordView />} />
+          <Route path="/auctions" element={<AuctionPropertiesView />} />
+          <Route path="/auctions/:id" element={<AuctionDetailView />} />
+          <Route path="/sdv-calculator" element={<SDVCalculatorView />} />
+          <Route path="/mortgage" element={<MortgageView />} />
+          <Route path="/mortgage-calculator" element={<MortgageCalculatorView />} />
           <Route
             path="/admin/*"
             element={
@@ -205,7 +226,12 @@ const App: React.FC = () => {
         onSwitchToLogin={openLogin}
       />
 
-      <Footer />
+      <PremiumModal
+        isOpen={isPremiumModalOpen}
+        onClose={() => setIsPremiumModalOpen(false)}
+      />
+
+      {!location.pathname.startsWith('/dashboard') && !location.pathname.startsWith('/admin') && <Footer />}
     </div>
     // </SiteConfigProvider>
   );

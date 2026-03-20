@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import RequirementsSidebar from '@/components/RequirementsSidebar';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import RequirementCard from '@/components/RequirementCard';
 import Pagination from '@/components/Pagination';
 import { requirementService } from '@/services/api';
@@ -7,6 +6,9 @@ import { Requirement } from '@/types/types';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import AddRequirementModal from '@/components/AddRequirementModal';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
+import FilterBar from '@/components/FilterBar';
+import AdvertisementBanner from '@/components/AdvertisementBanner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const RequirementsView: React.FC = () => {
   const { config } = useSiteConfig();
@@ -62,24 +64,64 @@ const RequirementsView: React.FC = () => {
       maxArea: 2500,
       description: 'Need ground floor retail with high foot traffic and corner visibility.',
       contactMethod: 'Phone'
+    },
+    {
+      id: 1005,
+      purpose: 'Buy',
+      type: 'Plots',
+      minBudget: 2500000,
+      maxBudget: 4500000,
+      location: 'Mohaba Bazar, Raipur',
+      minArea: 1500,
+      maxArea: 3000,
+      description: 'Searching for residential plot in gated colony. West facing preferred.',
+      contactMethod: 'In-app'
+    },
+    {
+      id: 1006,
+      purpose: 'Rent',
+      type: 'Commercial',
+      minBudget: 15000,
+      maxBudget: 35000,
+      location: 'Teddy Industrial Area',
+      minArea: 5000,
+      maxArea: 8000,
+      description: 'Looking for warehouse space with 24ft height and heavy vehicle access.',
+      contactMethod: 'Email'
+    },
+    {
+      id: 1007,
+      purpose: 'Buy',
+      type: 'Residential',
+      minBudget: 3500000,
+      maxBudget: 5500000,
+      location: 'Kaurin Bhata, Rajnandgaon',
+      minArea: 1000,
+      maxArea: 1500,
+      description: 'Ready to move 3BHK bungalow. Budget up to 55L for verified property.',
+      contactMethod: 'Phone'
     }
   ];
 
-  const [filters, setFilters] = useState({
+  const [appliedFilters, setAppliedFilters] = useState<any>({
     purpose: 'All',
     type: 'All',
     minBudget: '',
     maxBudget: '',
-    locality: ''
+    searchQuery: '',
+    showPremium: false
   });
+  const [sortBy, setSortBy] = useState('Newest First');
+  const threshold = Number(config.premium_price_threshold) || 30000000;
 
-  const [appliedFilters, setAppliedFilters] = useState(filters);
-  const [sortBy, setSortBy] = useState('Choose an option...');
+  const isPremiumItem = useCallback((req: Requirement) => {
+    return req.is_premium || req.maxBudget >= threshold;
+  }, [threshold]);
 
-  const fetchRequirements = async () => {
+  const fetchRequirements = useCallback(async (premiumOnly: boolean) => {
     setLoading(true);
     try {
-      const data = await requirementService.getAll();
+      const data = await requirementService.getAll({ premium_only: premiumOnly ? 'true' : 'false' });
       setRequirements(data && data.length > 0 ? data : mockRequirements);
     } catch (error) {
       console.error('Failed to fetch requirements:', error);
@@ -87,164 +129,134 @@ const RequirementsView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mockRequirements]);
 
-  useEffect(() => {
-    fetchRequirements();
-  }, []);
-
-  const handleFilterChange = (name: string, value: string) => {
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const applyFilters = () => {
+  // handleSearch stabilized with useCallback
+  const handleSearch = useCallback((filters: any) => {
+    // If premium toggle changed, or if it's the first load, we refetch to ensure fresh data
+    const isInitialLoad = requirements.length === 0 && loading;
+    if (filters.showPremium !== appliedFilters.showPremium || isInitialLoad) {
+      fetchRequirements(filters.showPremium);
+    }
     setAppliedFilters(filters);
-  };
+  }, [appliedFilters.showPremium, fetchRequirements, requirements.length, loading]);
 
-  const resetFilters = () => {
-    const defaultFilters = {
-      purpose: 'All',
-      type: 'All',
-      minBudget: '',
-      maxBudget: '',
-      locality: ''
-    };
-    setFilters(defaultFilters);
-    setAppliedFilters(defaultFilters);
-  };
+  // No initial fetch here; FilterBar triggers handleSearch on mount
+
+  const { isPremium, userRole } = useAuth();
+  const hasPremiumAccess = isPremium || userRole === 'admin';
 
   const filteredRequirements = useMemo(() => {
     return requirements.filter(req => {
+      // ── PREMIUM TOGGLE LOGIC (Threshold-Synced) ──
+      if (appliedFilters.showPremium) {
+          // Toggle ON: Show ONLY premium requirements
+          if (!isPremiumItem(req)) return false;
+      } else {
+          // Toggle OFF: Show ONLY standard requirements
+          if (isPremiumItem(req)) return false;
+      }
+
       const matchPurpose = appliedFilters.purpose === 'All' || req.purpose === appliedFilters.purpose;
       const matchType = appliedFilters.type === 'All' || req.type === appliedFilters.type;
       const matchMinBudget = !appliedFilters.minBudget || Number(req.minBudget) >= Number(appliedFilters.minBudget);
       const matchMaxBudget = !appliedFilters.maxBudget || Number(req.maxBudget) <= Number(appliedFilters.maxBudget);
-      const matchLocality = !appliedFilters.locality || req.location.toLowerCase().includes(appliedFilters.locality.toLowerCase());
+      const matchSearch = !appliedFilters.searchQuery || 
+                         req.location?.toLowerCase().includes(appliedFilters.searchQuery.toLowerCase()) ||
+                         req.description?.toLowerCase().includes(appliedFilters.searchQuery.toLowerCase());
 
-      return matchPurpose && matchType && matchMinBudget && matchMaxBudget && matchLocality;
+      return matchPurpose && matchType && matchMinBudget && matchMaxBudget && matchSearch;
     }).sort((a, b) => {
       if (sortBy === 'Budget: Low to High') return Number(a.minBudget) - Number(b.minBudget);
       if (sortBy === 'Budget: High to Low') return Number(b.minBudget) - Number(a.minBudget);
       if (sortBy === 'Newest First') return Number(b.id) - Number(a.id);
       return 0;
     });
-  }, [requirements, appliedFilters, sortBy]);
+  }, [requirements, appliedFilters, sortBy, hasPremiumAccess, isPremiumItem]);
 
   return (
-    <main className="bg-[#fcfdfd]">
-      {/* Inline Hero */}
-      <div className="bg-[#e2f2f0] py-20 px-4 text-center border-b border-[#d1e8e5]">
-        <div className="max-w-4xl mx-auto space-y-4">
-          <h1 className="text-4xl md:text-5xl font-black text-[#2d3748] tracking-tight uppercase">
-            {config.hero_title || 'Property Requirements'}
-          </h1>
-          <p className="text-base text-gray-500 max-w-2xl mx-auto font-medium">
-            {config.hero_subtitle || 'Browse what buyers and tenants are looking for in Rajnandgaon, or post your own requirement to connect with property owners.'}
-          </p>
-          <div className="pt-8">
+    <main className="bg-white">
+      {/* Landing Hero */}
+      <div className="bg-[#40a28f] py-28 px-4 text-center text-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto space-y-8 relative z-10">
+          <div className="space-y-6">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight max-w-5xl mx-auto uppercase">
+              {config.requirements_hero_title || 'Property Requirements'}
+            </h1>
+            <p className="text-xl md:text-2xl text-white/90 font-medium max-w-3xl mx-auto leading-relaxed">
+              {config.requirements_hero_subtitle || 'Discover what buyers and tenants are looking for. Connect directly with serious leads.'}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center pt-4 w-full">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="bg-[#40a28f] text-white px-10 py-4 rounded-xl font-black uppercase tracking-widest text-[11px] hover:bg-[#358a7a] transition-all shadow-2xl shadow-[#40a28f]/30 flex items-center gap-3 mx-auto active:scale-95"
+              className="bg-[#e2f2f0]/90 backdrop-blur-sm text-[#40a28f] px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-2xl shadow-black/10 hover:bg-white hover:scale-105 transition-all active:scale-[0.98] mb-8"
             >
-              <div className="bg-white/20 p-1.5 rounded-lg">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
               Post Your Requirement
             </button>
+            <AdvertisementBanner mode="requirement" />
           </div>
         </div>
+
+        {/* Decorative Circles */}
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -top-24 -left-24 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex flex-col lg:flex-row gap-12">
-          {/* Sidebar */}
-          <aside className="w-full lg:w-80 shrink-0">
-            <RequirementsSidebar
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onApplyFilters={applyFilters}
-              onReset={resetFilters}
-              activeCount={requirements.filter(r => Number(r.id) > 1000 || typeof r.id === 'string' && r.id.startsWith('m')).length}
-            />
-          </aside>
+      <FilterBar mode="requirement" onSearch={handleSearch} />
 
-          {/* Main Content */}
-          <div className="flex-grow space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-gray-100 pb-6">
-              <div className="space-y-1">
-                <span className="text-xl font-black text-gray-800 tracking-tight">
-                  {loading ? 'Searching...' : `${filteredRequirements.length} requirements found`}
-                </span>
-                <p className="text-[10px] font-black text-[#40a28f] uppercase tracking-[0.2em]">Verified Community Requirements</p>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="bg-[#40a28f] text-white px-4 py-2.5 rounded-lg font-black uppercase tracking-widest text-[10px] hover:bg-[#358a7a] transition-all shadow-md flex items-center gap-2 group"
-                >
-                  <svg className="h-3.5 w-3.5 group-hover:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Post Requirement
-                </button>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-white border border-gray-100 rounded-xl py-2.5 px-5 pr-12 appearance-none focus:outline-none focus:ring-2 focus:ring-[#40a28f]/20 focus:border-[#40a28f] text-gray-500 text-sm font-bold transition-all min-w-[200px] shadow-sm"
-                  >
-                    <option>Choose an option...</option>
-                    <option>Budget: Low to High</option>
-                    <option>Budget: High to Low</option>
-                    <option>Newest First</option>
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300 pointer-events-none" />
-                </div>
-              </div>
+      <section className="max-w-7xl mx-auto px-4 pt-20 pb-24">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-black text-gray-800 tracking-tight">Community Requirements</h2>
+            <p className="text-[10px] font-black text-[#40a28f] uppercase tracking-[0.2em]">Verified & Active Postings</p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-gray-50 border border-gray-100 rounded-2xl py-3 px-6 pr-12 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 text-gray-500 text-xs font-black uppercase tracking-widest"
+              >
+                <option value="Newest First">Newest First</option>
+                <option value="Budget: Low to High">Budget: Low to High</option>
+                <option value="Budget: High to Low">Budget: High to Low</option>
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300 pointer-events-none" />
             </div>
-
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-32 space-y-4">
-                <Loader2 className="h-10 w-10 animate-spin text-[#40a28f]" />
-                <p className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Mapping Requirements</p>
-              </div>
-            ) : filteredRequirements.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {filteredRequirements.map((req) => (
-                  <RequirementCard key={req.id} requirement={req} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-32 bg-gray-50/50 rounded-[40px] border-2 border-dashed border-gray-100">
-                <div className="max-w-xs mx-auto space-y-4">
-                  <div className="bg-white w-16 h-16 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
-                    <Loader2 className="h-8 w-8 text-gray-200" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-800 uppercase tracking-tight">No match found</h3>
-                  <p className="text-sm text-gray-400 font-medium leading-relaxed">Try adjusting your filters to see more requirements from the community.</p>
-                  <button onClick={resetFilters} className="text-[#40a28f] font-black text-xs uppercase tracking-[0.2em] hover:underline pt-2">
-                    Clear all filters
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {filteredRequirements.length > 0 && (
-              <div className="pt-12 flex justify-center">
-                <Pagination />
-              </div>
-            )}
           </div>
         </div>
-      </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-[#40a28f]" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Loading Requirements</p>
+          </div>
+        ) : filteredRequirements.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredRequirements.map((req) => (
+              <RequirementCard key={req.id} requirement={req} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-32 bg-gray-50 rounded-[48px] border-2 border-dashed border-gray-100">
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">No requirements found matching your criteria.</p>
+          </div>
+        )}
+
+        {filteredRequirements.length > 0 && (
+          <div className="pt-16">
+            <Pagination />
+          </div>
+        )}
+      </section>
 
       <AddRequirementModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchRequirements}
+        onSuccess={() => fetchRequirements(appliedFilters.showPremium)}
       />
     </main>
   );

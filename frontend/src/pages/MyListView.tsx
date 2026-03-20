@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Trash2, ArrowRight, Building2, MapPin } from 'lucide-react';
 import { Property } from '@/types/types';
+import { getImageUrl } from '@/services/api';
 
 const MyListView: React.FC = () => {
     const navigate = useNavigate();
@@ -48,7 +49,7 @@ const MyListView: React.FC = () => {
                             <div key={property.id} className="group bg-white rounded-[40px] border border-gray-50 shadow-sm hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 overflow-hidden relative">
                                 <div className="h-64 relative overflow-hidden">
                                     <img
-                                        src={property.imageUrl}
+                                        src={getImageUrl(property.imageUrl)}
                                         alt={property.title}
                                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                     />

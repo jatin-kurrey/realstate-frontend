@@ -2,23 +2,21 @@ import React, { useState, useEffect } from 'react';
 import {
   Home, FileText, Bell, CreditCard, Settings, Heart, ShieldCheck,
   Plus, User, AlertTriangle, LayoutGrid, Search, Loader2, LogOut,
-  TrendingUp, MessageSquare, CheckCircle, Eye, Phone, Calendar
+  TrendingUp, MessageSquare, CheckCircle, Eye, Phone, Calendar,
+  Edit, Trash2, EyeOff, Landmark, Crown
 } from 'lucide-react';
-import { propertyService, requirementService, adminService, paymentService, notificationService, bookmarkService, userService } from '@/services/api';
+import { propertyService, requirementService, adminService, notificationService, bookmarkService, userService } from '@/services/api';
 import { Property, Requirement, User as UserType } from '@/types/types';
 import PropertyCard from '@/components/PropertyCard';
 import AddPropertyModal from '@/components/AddPropertyModal';
 import AddRequirementModal from '@/components/AddRequirementModal';
 import ActivateListingModal from '@/components/ActivateListingModal';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
+import Footer from '@/components/Footer';
 
 type Tab = 'overview' | 'assets' | 'mylist' | 'requirements' | 'finance' | 'settings';
 
-// Mock Inquiries Data
-const MOCK_INQUIRIES = [
-  { id: 1, name: "Rahul Verma", phone: "+91 98765...", property: "Luxury Villa in Civil Lines", date: "2 mins ago", status: "New" },
-  { id: 2, name: "Anita Singh", phone: "+91 99887...", property: "Commercial Space", date: "2 hours ago", status: "Contacted" },
-  { id: 3, name: "Vikram Malhotra", phone: "+91 76543...", property: "2BHK Apartment", date: "1 day ago", status: "Pending" },
-];
+
 
 const DashboardView: React.FC = () => {
   const token = localStorage.getItem('token');
@@ -29,9 +27,7 @@ const DashboardView: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
   const [profile, setProfile] = useState<UserType | null>(null);
-  const [paymentStats, setPaymentStats] = useState<any>(null);
   const [shortlistCount, setShortlistCount] = useState(0);
   const [shortlistedProperties, setShortlistedProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +52,7 @@ const DashboardView: React.FC = () => {
     try {
       const fetchTasks: Promise<any>[] = [
         notificationService.getAll(),
-        requirementService.getAll(),
+        requirementService.getMyRequirements(),
         propertyService.getAll(), // for shortlist matching
         userService.getProfile()
       ];
@@ -64,14 +60,10 @@ const DashboardView: React.FC = () => {
       // Fetch listings for everyone
       fetchTasks.push(propertyService.getMyListings());
 
-      if (userRole === 'owner' || userRole === 'admin') {
-        fetchTasks.push(paymentService.getMyPayments());
-      }
-
       const results = await Promise.all(fetchTasks);
 
       setNotifications(results[0]);
-      setRequirements(results[1].slice(0, 5));
+      setRequirements(results[1]);
       const allProperties = results[2];
       const userProfile = results[3];
       setProfile(userProfile);
@@ -86,18 +78,13 @@ const DashboardView: React.FC = () => {
       setProperties(results[4] || []);
 
 
-      if (userRole === 'owner' || userRole === 'admin') {
-        const payRes = results[4] || [];
-        setPayments(payRes);
-        const totalAmount = payRes.reduce((acc: number, p: any) => acc + (p.status === 'Success' ? p.amount : 0), 0);
-        setPaymentStats({ total: totalAmount, count: payRes.filter((p: any) => p.status === 'Success').length });
-      }
-
       // Handle Shortlist
       if (token) {
         const bookmarks = await bookmarkService.getAll();
         setShortlistCount(bookmarks.length);
-        setShortlistedProperties(bookmarks);
+        // Correctly extract property from bookmark
+        const actualProperties = bookmarks.map((b: any) => b.property).filter(Boolean);
+        setShortlistedProperties(actualProperties);
       } else {
         const saved = localStorage.getItem('shortlisted_properties');
         if (saved) {
@@ -124,13 +111,21 @@ const DashboardView: React.FC = () => {
 
     // Check URL params for deep linking
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
+    const tabParam = params.get('tab');
     const action = params.get('action');
 
-    if (tab && ['overview', 'assets', 'mylist', 'requirements', 'finance', 'settings'].includes(tab)) {
-      setActiveTab(tab as Tab);
-    }
-    if (action === 'new') {
+    if (tabParam && ['overview', 'assets', 'mylist', 'requirements', 'finance', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam as Tab);
+      
+      if (action === 'new') {
+        if (tabParam === 'requirements' || tabParam === 'finance') {
+          setReqDefaultPurpose(tabParam === 'finance' ? 'Mortgage' : undefined);
+          setIsReqModalOpen(true);
+        } else if (tabParam === 'assets') {
+          setIsAddModalOpen(true);
+        }
+      }
+    } else if (action === 'new') {
       setIsAddModalOpen(true);
     }
 
@@ -138,26 +133,73 @@ const DashboardView: React.FC = () => {
   }, [userRole]);
 
   // Actions
+  const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
+  const [reqDefaultPurpose, setReqDefaultPurpose] = useState<string | undefined>(undefined);
   const handleEdit = (property: Property) => { setSelectedProperty(property); setIsAddModalOpen(true); };
+  const handleEditRequirement = (req: Requirement) => { setSelectedRequirement(req); setIsReqModalOpen(true); };
   const handleOpenActivate = (property: Property) => { setSelectedProperty(property); setIsActivateModalOpen(true); };
   const handleActivate = async () => {
     if (!selectedProperty) return;
     try {
-      await paymentService.processListingPayment({ property_id: selectedProperty.id as number, amount: 100, plan: '30 Days Activation' });
-      setIsActivateModalOpen(false); fetchDashboardData();
-    } catch (error) { console.error(error); alert('Activation failed.'); }
+      // Payment removed - directly activate in the future or keep disabled
+      alert('Payment feature removed. Please contact admin for activation.');
+      setIsActivateModalOpen(false);
+    } catch (error) { console.error(error); }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userRole');
     window.location.href = '/';
-  }
+  };
+
+  const { config } = useSiteConfig();
+
+  const handleTogglePropertyActive = async (id: number | string) => {
+    try {
+      await propertyService.toggleActive(id);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to toggle property status:', err);
+    }
+  };
+
+  const handleToggleRequirementActive = async (id: number | string) => {
+    try {
+      await requirementService.toggleActive(id);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to toggle requirement status:', err);
+    }
+  };
+
+  const handleDeleteProperty = async (id: number | string) => {
+    if (window.confirm('Are you sure you want to delete this property?')) {
+      try {
+        await propertyService.delete(id.toString());
+        fetchDashboardData();
+      } catch (err) {
+        console.error('Failed to delete property:', err);
+      }
+    }
+  };
+
+  const handleDeleteRequirement = async (id: number | string) => {
+    if (window.confirm('Are you sure you want to delete this requirement?')) {
+      try {
+        await requirementService.delete(id.toString());
+        fetchDashboardData();
+      } catch (err) {
+        console.error('Failed to delete requirement:', err);
+      }
+    }
+  };
+
 
   // --- Sub-Components ---
 
   const renderSidebar = () => (
-    <div className="hidden lg:flex flex-col w-72 bg-white border-r border-gray-100 min-h-screen fixed left-0 top-16 z-30 pt-8 px-6">
+    <div className="hidden lg:flex flex-col w-72 bg-white border-r border-gray-100 min-h-screen fixed left-0 top-20 z-30 pt-8 px-6 overflow-y-auto scrollbar-hide pb-20">
       <div className="space-y-8">
         {/* User Info */}
         <div className="flex items-center gap-3 px-2">
@@ -170,19 +212,6 @@ const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        {/* Profile Completion Widget */}
-        <div className="bg-gradient-to-br from-[#40a28f]/5 to-white border border-[#40a28f]/20 rounded-2xl p-4 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#40a28f]">Profile Status</span>
-              <span className="text-xs font-black text-gray-700">{completionPercentage}%</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-              <div className="bg-[#40a28f] h-1.5 rounded-full transition-all duration-1000" style={{ width: `${completionPercentage}%` }}></div>
-            </div>
-            <p className="text-[10px] text-gray-500 font-medium leading-tight">Complete verification to get the <span className="text-gray-800 font-bold">Trusted Badge</span>.</p>
-          </div>
-        </div>
 
         <div>
           <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Main Menu</h2>
@@ -190,24 +219,32 @@ const DashboardView: React.FC = () => {
             <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'overview' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
               <LayoutGrid className="h-5 w-5" /> Overview
             </button>
-            <button onClick={() => setActiveTab('assets')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'assets' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
-              <Home className="h-5 w-5" /> My Properties
-            </button>
-            <button onClick={() => setActiveTab('mylist')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'mylist' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
-              <Heart className="h-5 w-5" /> Saved List
-              {shortlistCount > 0 && <span className="ml-auto bg-[#40a28f] text-white text-[10px] px-2 py-0.5 rounded-full">{shortlistCount}</span>}
-            </button>
-            <button onClick={() => setActiveTab('requirements')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'requirements' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
-              <FileText className="h-5 w-5" /> My Requirements
-            </button>
-            {(userRole === 'owner' || userRole === 'admin') && (
-              <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'finance' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
-                <CreditCard className="h-5 w-5" /> Finance
+            {config['dashboard_my_properties'] === 'true' && (
+              <button onClick={() => setActiveTab('assets')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'assets' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <Home className="h-5 w-5" /> My Properties
               </button>
             )}
-            <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
-              <Settings className="h-5 w-5" /> Settings
-            </button>
+            {config['dashboard_saved_list'] === 'true' && (
+              <button onClick={() => setActiveTab('mylist')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'mylist' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <Heart className="h-5 w-5" /> Saved List
+                {shortlistCount > 0 && <span className="ml-auto bg-[#40a28f] text-white text-[10px] px-2 py-0.5 rounded-full">{shortlistCount}</span>}
+              </button>
+            )}
+            {config['dashboard_my_requirements'] === 'true' && (
+              <button onClick={() => setActiveTab('requirements')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'requirements' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <FileText className="h-5 w-5" /> My Requirements
+              </button>
+            )}
+            {config['dashboard_mortgage'] === 'true' && (userRole === 'owner' || userRole === 'admin') && (
+              <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'finance' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <CreditCard className="h-5 w-5" /> Mortgage
+              </button>
+            )}
+            {config['dashboard_settings'] === 'true' && (
+              <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-[#40a28f]/10 text-[#40a28f]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                <Settings className="h-5 w-5" /> Settings
+              </button>
+            )}
             {userRole === 'admin' && (
               <button onClick={() => window.location.href = '/admin'} className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold text-[#40a28f] bg-[#40a28f]/5 hover:bg-[#40a28f]/10 transition-all border border-[#40a28f]/20 mt-4">
                 <ShieldCheck className="h-5 w-5" /> Switch to Admin
@@ -227,22 +264,18 @@ const DashboardView: React.FC = () => {
 
   const renderOverview = () => (
     <div className="space-y-10 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-[#40a28f] p-10 rounded-[40px] text-white relative overflow-hidden shadow-xl shadow-[#40a28f]/20">
-        <div className="space-y-2 relative z-10">
-          <h1 className="text-4xl font-black uppercase tracking-tighter">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-[#40a28f] p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] text-white relative overflow-hidden shadow-xl shadow-[#40a28f]/20">
+        <div className="space-y-2 relative z-10 w-full">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">
             Welcome, {profile?.name || (userRole === 'owner' ? 'Owner' : 'User')}
           </h1>
-          <p className="text-white/80 font-medium tracking-wide">
+          <p className="text-white/80 text-xs sm:text-base font-medium tracking-wide">
             {userRole === 'owner' ? 'Track your property performance & leads.' : 'Track your property search journey.'}
           </p>
         </div>
         <div className="relative z-10 hidden sm:block">
           <div className="flex gap-3">
-            <div className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl border border-white/20 text-center">
-              <span className="block text-xl font-black">{completionPercentage}%</span>
-              <span className="text-[9px] uppercase tracking-widest opacity-80">Profile</span>
-            </div>
-            <div className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl border border-white/20 text-center">
+            <div className="px-6 py-2 bg-white/20 backdrop-blur-md rounded-xl border border-white/20 text-center">
               <span className="block text-xl font-black">{userRole === 'owner' ? properties.length : shortlistCount}</span>
               <span className="text-[9px] uppercase tracking-widest opacity-80">{userRole === 'owner' ? 'Listings' : 'Saved'}</span>
             </div>
@@ -251,15 +284,32 @@ const DashboardView: React.FC = () => {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-24 -mt-24"></div>
       </div>
 
+      {!profile?.is_premium && (
+        <div className="bg-gradient-to-br from-amber-400 to-amber-600 p-8 rounded-[40px] text-white shadow-xl shadow-amber-500/20 relative overflow-hidden flex flex-col lg:flex-row items-center justify-between gap-6 group border border-amber-300/30">
+          <div className="absolute top-0 right-0 p-8 opacity-10 transform translate-x-12 -translate-y-12 group-hover:scale-110 transition-transform">
+            <Crown className="w-48 h-48" />
+          </div>
+          <div className="relative z-10 space-y-2 text-center lg:text-left">
+            <h3 className="text-2xl font-black uppercase tracking-tight">Unlock Professional Grade Intelligence</h3>
+            <p className="text-white/90 text-sm font-medium">Access high-value properties (₹3Cr+), detailed lead analytics, and priority verification labels.</p>
+          </div>
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('openPremiumModal'))}
+            className="relative z-10 px-10 py-4 bg-white text-amber-600 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl hover:bg-amber-50 transition-all active:scale-95 whitespace-nowrap"
+          >
+            Go Premium
+          </button>
+        </div>
+      )}
+
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: userRole === 'owner' ? 'Total Views' : 'Shortlisted', value: userRole === 'owner' ? 1240 : shortlistCount, icon: userRole === 'owner' ? Eye : Heart, color: 'text-[#40a28f]' },
-          { label: userRole === 'owner' ? 'Total Leads' : 'Matches', value: userRole === 'owner' ? 24 : requirements.length, icon: userRole === 'owner' ? MessageSquare : Search, color: 'text-blue-500' },
+          { label: userRole === 'owner' ? 'Listings' : 'Shortlisted', value: userRole === 'owner' ? properties.length : shortlistCount, icon: userRole === 'owner' ? Home : Heart, color: 'text-[#40a28f]' },
+          { label: userRole === 'owner' ? 'Requirements' : 'Matches', value: requirements.length, icon: userRole === 'owner' ? FileText : Search, color: 'text-blue-500' },
           { label: 'Notifications', value: notifications.filter(n => !n.is_read).length, icon: Bell, color: 'text-red-400' },
-          { label: 'Security Score', value: '100%', icon: ShieldCheck, color: 'text-emerald-500' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+          <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow shrink-0">
             <div className={`p-4 bg-gray-50 rounded-2xl ${stat.color} bg-opacity-10`}>
               <stat.icon className={`h-6 w-6 ${stat.color}`} />
             </div>
@@ -275,36 +325,7 @@ const DashboardView: React.FC = () => {
         {/* Main Content Area (2 cols) */}
         <div className="lg:col-span-2 space-y-8">
           {/* Recent Leads (Owner) or Matching Properties (Seeker) */}
-          {userRole === 'owner' ? (
-            <div className="bg-white rounded-[40px] border border-gray-100 overflow-hidden">
-              <div className="p-8 border-b border-gray-50 flex justify-between items-center">
-                <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase">Recent Inquiries</h3>
-                <button className="text-[#40a28f] text-xs font-bold uppercase tracking-widest hover:underline">View All</button>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {MOCK_INQUIRIES.map(inquiry => (
-                  <div key={inquiry.id} className="p-6 hover:bg-gray-50/50 transition-colors flex items-center justify-between group">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center font-bold">
-                        {inquiry.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-800">{inquiry.name}</p>
-                        <p className="text-xs text-gray-400 font-medium">Interested in <span className="text-gray-600">{inquiry.property}</span></p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex gap-2 justify-end mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 bg-[#25D366] text-white rounded-full hover:scale-110 transition-transform"><MessageSquare className="h-3 w-3" /></button>
-                        <button className="p-2 bg-blue-500 text-white rounded-full hover:scale-110 transition-transform"><Phone className="h-3 w-3" /></button>
-                      </div>
-                      <p className="text-[10px] font-black uppercase text-gray-300 tracking-widest">{inquiry.date}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+
         </div>
 
         {/* Sidebar Area (1 col) - Market Intelligence */}
@@ -312,16 +333,24 @@ const DashboardView: React.FC = () => {
 
 
           {/* Premium Upsell Card */}
-          {userRole === 'owner' && (
-            <div className="bg-[#1e293b] rounded-[40px] p-8 text-white text-center space-y-4">
-              <div className="w-12 h-12 bg-[#40a28f] rounded-full flex items-center justify-center mx-auto shadow-lg shadow-[#40a28f]/40">
-                <TrendingUp className="h-6 w-6 text-white" />
+          {(!profile?.is_premium && userRole !== 'admin') && (
+            <div className="bg-gradient-to-br from-[#1e293b] to-[#0f172a] rounded-[40px] p-8 text-white text-center space-y-6 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-all duration-700"></div>
+              <div className="w-16 h-16 bg-gradient-to-tr from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20 rotate-3 group-hover:rotate-6 transition-transform">
+                <Crown className="h-8 w-8 text-white" />
               </div>
-              <div>
-                <h4 className="font-black uppercase tracking-widest text-lg">Boost Listing</h4>
-                <p className="text-gray-400 text-xs font-medium mt-2">Get 5x more leads by promoting your top properties.</p>
+              <div className="space-y-2">
+                <h4 className="font-black uppercase tracking-widest text-xl">Upgrade to Premium</h4>
+                <p className="text-gray-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
+                  List luxury properties, access exclusive requirements, and get priority support.
+                </p>
               </div>
-              <button className="w-full py-3 bg-white text-[#1e293b] rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">Start Promoting</button>
+              <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('openPremiumModal'))}
+                className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
+              >
+                Become Premium
+              </button>
             </div>
           )}
         </div>
@@ -349,9 +378,9 @@ const DashboardView: React.FC = () => {
             onViewDetails={(prop) => window.location.href = `/properties/${prop.id}`}
             onActivate={handleOpenActivate}
             onEdit={handleEdit}
+            onToggleActive={(prop) => handleTogglePropertyActive(prop.id)}
+            onDelete={(prop) => handleDeleteProperty(prop.id)}
             compact
-            // Mock stats for demonstration
-            stats={{ views: Math.floor(Math.random() * 500) + 50, leads: Math.floor(Math.random() * 20) }}
           />
         ))}
         {properties.length === 0 && (
@@ -373,49 +402,108 @@ const DashboardView: React.FC = () => {
 
   const renderFinance = () => (
     <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">Payment History</h2>
-        <p className="text-gray-400 font-medium text-sm pt-1">Listing subscriptions and transactions</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">Mortgage & Lending</h2>
+          <p className="text-gray-400 font-medium text-sm pt-1">Manage your borrowing requests and payments</p>
+        </div>
+        <button 
+          onClick={() => { 
+            setSelectedRequirement(null); 
+            setReqDefaultPurpose('Mortgage');
+            setIsReqModalOpen(true); 
+          }} 
+          className="bg-[#40a28f] text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-xl shadow-[#40a28f]/20 hover:bg-[#358a7a] transition-all"
+        >
+          <Plus className="h-4 w-4" /> Post Mortgage Request
+        </button>
       </div>
 
-      <div className="bg-[#1e293b] rounded-[40px] p-10 text-white flex flex-col sm:flex-row justify-between items-center gap-6 shadow-2xl">
-        <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-[#40a28f]">Total Spend</p>
-          <div className="text-5xl font-black tracking-tighter">₹{paymentStats?.total || 0}</div>
+      {/* Own Mortgage Requests */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {requirements.filter(r => r.purpose === 'Mortgage').length > 0 ? requirements.filter(r => r.purpose === 'Mortgage').map(req => (
+          <div key={req.id} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all flex flex-col justify-between">
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.is_verified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                {req.is_verified ? 'Approved' : 'Pending'}
+              </span>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100">
+                  <Landmark className="w-5 h-5 text-[#40a28f]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-800 uppercase tracking-tight">₹{(req.maxBudget / 100000).toFixed(1)}L Loan</h3>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{req.type} Collateral</p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100">
+                  Rate: {req.expected_rate || 'Market'}
+                </div>
+                <div className="px-3 py-1 bg-gray-50 rounded-lg text-[9px] font-bold text-gray-600 border border-gray-100">
+                  {req.location}
+                </div>
+              </div>
+              <div className="pt-4 flex items-center gap-3 border-t border-gray-50">
+                <button 
+                  onClick={() => { setSelectedRequirement(req); setReqDefaultPurpose('Mortgage'); setIsReqModalOpen(true); }}
+                  className="flex-1 py-2 bg-gray-50 text-gray-400 hover:text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all"
+                >
+                  <Edit className="h-3 w-3 inline mr-1" /> Edit
+                </button>
+                <button 
+                  onClick={() => handleDeleteRequirement(req.id)}
+                  className="px-3 py-2 bg-gray-50 text-red-300 hover:text-red-500 rounded-lg transition-all"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )) : (
+          <div className="col-span-full py-16 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100">
+            <Landmark className="h-10 w-10 text-gray-200 mx-auto mb-4" />
+            <p className="text-gray-400 font-medium text-xs">No active mortgage requests.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Community Opportunities Section (Sample Content) */}
+      <div className="pt-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-50 rounded-xl">
+             <TrendingUp className="w-5 h-5 text-amber-500" />
+          </div>
+          <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Community Lending Board</h3>
         </div>
-        <div className="px-6 py-3 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-md">
-          <p className="text-[10px] font-black uppercase tracking-widest text-white/80">Successful Tx: {paymentStats?.count || 0}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { id: 's1', amount: '25L', asset: 'Commercial', rate: '10.5%', location: 'Rajnandgaon' },
+            { id: 's2', amount: '12L', asset: 'Residential', rate: '12%', location: 'Durg' },
+            { id: 's3', amount: '50L', asset: 'Plots', rate: '9.8%', location: 'Raipur' }
+          ].map(sample => (
+            <div key={sample.id} className="bg-gray-50 p-5 rounded-[28px] border border-gray-100 opacity-60 hover:opacity-100 transition-all cursor-not-allowed">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start text-[8px] font-black uppercase tracking-widest text-amber-600">
+                  <span>Sample Req</span>
+                  <span className="bg-white px-2 py-0.5 rounded-full border border-amber-100">Live Board</span>
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-gray-800">₹{sample.amount} Loan</h4>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase">{sample.asset} Security</p>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100">
+                  <span className="text-[10px] font-black text-[#40a28f]">{sample.rate} Rate</span>
+                  <span className="text-[9px] font-bold text-gray-400">{sample.location}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-[40px] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50/50 text-gray-400 font-black uppercase tracking-widest text-[10px]">
-              <tr>
-                <th className="px-8 py-5">Date</th>
-                <th className="px-8 py-5">Item</th>
-                <th className="px-8 py-5 text-right">Amount</th>
-                <th className="px-8 py-5 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.length > 0 ? payments.map((tx, i) => (
-                <tr key={tx.id} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="px-8 py-5 font-bold text-gray-700">{new Date(tx.created_at).toLocaleDateString()}</td>
-                  <td className="px-8 py-5 text-xs font-bold text-gray-500">{tx.property?.title || 'Listing Activation'}</td>
-                  <td className="px-8 py-5 text-right font-black text-gray-900">₹{tx.amount}</td>
-                  <td className="px-8 py-5 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${tx.status === 'Success' ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}>{tx.status}</span>
-                  </td>
-                </tr>
-              )) : (
-                <tr><td colSpan={4} className="px-8 py-10 text-center text-gray-400 italic">No transaction history found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 
@@ -444,34 +532,6 @@ const DashboardView: React.FC = () => {
         <p className="text-gray-400 font-medium text-sm pt-1">Manage profile security and preferences</p>
       </div>
 
-      {/* Profile Completeness Large Widget */}
-      <div className="bg-white rounded-[40px] border border-gray-100 p-10 space-y-6 shadow-sm relative overflow-hidden">
-        <div className="flex justify-between items-start relative z-10">
-          <div>
-            <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight mb-2">Profile Completeness</h3>
-            <p className="text-sm text-gray-500 max-w-md">Complete your profile to unlock the <span className="text-[#40a28f] font-bold">Verified Badge</span> and get 20% more visibility.</p>
-          </div>
-          <div className="text-4xl font-black text-[#40a28f]">{completionPercentage}%</div>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 relative z-10">
-          <div className="bg-[#40a28f] h-3 rounded-full transition-all duration-1000" style={{ width: `${completionPercentage}%` }}></div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 relative z-10">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
-            <CheckCircle className="h-4 w-4 text-[#40a28f]" /> Email Verified
-          </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
-            <CheckCircle className="h-4 w-4 text-[#40a28f]" /> Phone Verified
-          </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-            <div className="h-4 w-4 rounded-full border-2 border-gray-300"></div> Add Photo
-          </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-            <div className="h-4 w-4 rounded-full border-2 border-gray-300"></div> KYC
-          </div>
-        </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#40a28f]/5 rounded-full blur-3xl -mr-12 -mt-12"></div>
-      </div>
 
       <div className="bg-white rounded-[40px] border border-gray-100 p-10 space-y-8 shadow-sm">
         <div className="flex items-center gap-4 border-b border-gray-50 pb-8">
@@ -548,18 +608,30 @@ const DashboardView: React.FC = () => {
           <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">My Requirements</h2>
           <p className="text-gray-400 font-medium text-sm pt-1">Manage your posted needs</p>
         </div>
-        <button onClick={() => setIsReqModalOpen(true)} className="bg-[#40a28f] text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-xl shadow-[#40a28f]/20 hover:bg-[#358a7a] transition-all">
+        <button 
+          onClick={() => {
+            setSelectedRequirement(null);
+            setReqDefaultPurpose(undefined);
+            setIsReqModalOpen(true);
+          }} 
+          className="bg-[#40a28f] text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-xl shadow-[#40a28f]/20 hover:bg-[#358a7a] transition-all"
+        >
           <Plus className="h-4 w-4" /> Post Requirement
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {requirements.length > 0 ? requirements.map(req => (
-          <div key={req.id} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-            <div className="absolute top-4 right-4 z-10">
+          <div key={req.id} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all flex flex-col justify-between">
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.is_verified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                 {req.is_verified ? 'Approved' : 'Pending Approval'}
               </span>
+              {!req.is_active && (
+                <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 border border-gray-200 flex items-center gap-1">
+                  <EyeOff className="h-2.5 w-2.5" /> Hidden
+                </span>
+              )}
             </div>
             <div className="space-y-4">
               <div>
@@ -575,6 +647,27 @@ const DashboardView: React.FC = () => {
                 </div>
               </div>
               <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{req.description}</p>
+              
+              <div className="pt-4 flex items-center gap-3 border-t border-gray-50">
+                <button 
+                  onClick={() => handleEditRequirement(req)}
+                  className="flex-1 py-2.5 bg-gray-50 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-transparent hover:border-emerald-100"
+                >
+                  <Edit className="h-3.5 w-3.5" /> Edit
+                </button>
+                <button 
+                  onClick={() => handleToggleRequirementActive(req.id)}
+                  className={`flex-1 py-2.5 border rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${req.is_active ? 'bg-gray-50 text-amber-500 border-amber-100 hover:bg-amber-50' : 'bg-gray-50 text-emerald-500 border-emerald-100 hover:bg-emerald-50'}`}
+                >
+                  {req.is_active ? <><EyeOff className="h-3.5 w-3.5" /> Hide</> : <><Eye className="h-3.5 w-3.5" /> Unhide</>}
+                </button>
+                <button 
+                  onClick={() => handleDeleteRequirement(req.id)}
+                  className="px-3 py-2.5 bg-gray-50 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-100 transition-all"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         )) : (
@@ -584,45 +677,63 @@ const DashboardView: React.FC = () => {
           </div>
         )}
       </div>
-      <AddRequirementModal isOpen={isReqModalOpen} onClose={() => setIsReqModalOpen(false)} onSuccess={fetchDashboardData} />
+      <AddRequirementModal 
+        isOpen={isReqModalOpen} 
+        onClose={() => { setIsReqModalOpen(false); setSelectedRequirement(null); setReqDefaultPurpose(undefined); }} 
+        requirement={selectedRequirement}
+        defaultPurpose={reqDefaultPurpose}
+        onSuccess={fetchDashboardData} 
+      />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#fcfdfd]">
-      {renderSidebar()}
+    <div className="min-h-screen bg-[#fcfdfd] flex flex-col">
+      <div className="flex flex-1 relative">
+        {renderSidebar()}
 
-      <div className="lg:pl-72 pt-8 lg:pt-0">
-        {/* Mobile Tab Bar */}
-        <div className="lg:hidden flex overflow-x-auto gap-2 p-4 no-scrollbar bg-white sticky top-0 z-20 border-b border-gray-100">
-          {['overview', 'assets', 'mylist', 'requirements', 'finance', 'settings'].map(t => (
-            <button key={t} onClick={() => setActiveTab(t as Tab)} className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === t ? 'bg-[#40a28f] text-white' : 'bg-gray-50 text-gray-400'}`}>
-              {t}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'assets' && renderAssets()}
-          {activeTab === 'finance' && renderFinance()}
-          {activeTab === 'requirements' && renderRequirements()}
-          {activeTab === 'settings' && renderSettings()}
-          {activeTab === 'mylist' && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-              <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">Saved Homes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                {shortlistedProperties.length > 0 ? shortlistedProperties.map(property => (
-                  <PropertyCard key={property.id} property={property} onViewDetails={(prop) => window.location.href = `/properties/${prop.id}`} compact />
-                )) : (
-                  <div className="col-span-full py-20 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100">
-                    <Heart className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                    <p className="text-gray-400 font-medium">Your saved list is empty.</p>
-                  </div>
-                )}
-              </div>
+        <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
+          <div className="flex-grow">
+            {/* Mobile Tab Bar */}
+            <div className="lg:hidden flex overflow-x-auto gap-2 p-4 no-scrollbar bg-white sticky top-20 z-20 border-b border-gray-100">
+              {[
+                { id: 'overview', label: 'Overview', show: true },
+                { id: 'assets', label: 'Properties', show: config['dashboard_my_properties'] === 'true' },
+                { id: 'mylist', label: 'Saved', show: config['dashboard_saved_list'] === 'true' },
+                { id: 'requirements', label: 'Needs', show: config['dashboard_my_requirements'] === 'true' },
+                { id: 'finance', label: 'Mortgage', show: config['dashboard_mortgage'] === 'true' && (userRole === 'owner' || userRole === 'admin') },
+                { id: 'settings', label: 'Settings', show: config['dashboard_settings'] === 'true' }
+              ].filter(t => t.show).map(t => (
+                <button key={t.id} onClick={() => setActiveTab(t.id as Tab)} className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-[#40a28f] text-white' : 'bg-gray-50 text-gray-400'}`}>
+                  {t.label}
+                </button>
+              ))}
             </div>
-          )}
+
+            <div className="p-4 sm:p-8 lg:p-12 max-w-7xl mx-auto">
+              {activeTab === 'overview' && renderOverview()}
+              {activeTab === 'assets' && renderAssets()}
+              {activeTab === 'finance' && renderFinance()}
+              {activeTab === 'requirements' && renderRequirements()}
+              {activeTab === 'settings' && renderSettings()}
+              {activeTab === 'mylist' && (
+                <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                  <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tight">Saved Homes</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                    {shortlistedProperties.length > 0 ? shortlistedProperties.map(property => (
+                      <PropertyCard key={property.id} property={property} onViewDetails={(prop) => window.location.href = `/properties/${prop.id}`} compact />
+                    )) : (
+                      <div className="col-span-full py-20 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100">
+                        <Heart className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+                        <p className="text-gray-400 font-medium">Your saved list is empty.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <Footer />
         </div>
       </div>
     </div>

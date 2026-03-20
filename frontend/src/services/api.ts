@@ -1,9 +1,42 @@
 import axios from 'axios';
-import { Property, Requirement } from '../types/types';
+import { Property, Requirement, Advertisement } from '../types/types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5002';
+const getApiBaseUrl = () => {
+    // If it's explicitly set in the env
+    const envUrl = (import.meta as any).env?.VITE_API_URL;
+    if (envUrl && envUrl !== 'http://localhost:5002') return envUrl;
+    
+    // Auto-detect based on where the frontend is served from
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        // If we are browsing on a local network IP or other remote host, assume backend is running on the same IP at port 5002
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+             return `${window.location.protocol}//${hostname}:5002`;
+        }
+    }
+    
+    return 'http://localhost:5002';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const API_URL = `${API_BASE_URL}/api`;
-export { API_URL };
+
+export const getImageUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+        // If it accidentally hardcoded localhost in database, rewrite it dynamically
+        if (url.includes('localhost:5001') || url.includes('localhost:5002') || url.includes('localhost:8080')) {
+            const path = new URL(url).pathname;
+            return `${API_BASE_URL}${path}`;
+        }
+        return url;
+    }
+    // Prefix relative paths with the determined backend URL
+    const relativePath = url.startsWith('/') ? url : `/uploads/${url}`;
+    return `${API_BASE_URL}${relativePath}`;
+};
+
+export { API_URL, API_BASE_URL };
 
 const api = axios.create({
     baseURL: API_URL,
@@ -42,8 +75,8 @@ api.interceptors.response.use(
 );
 
 export const propertyService = {
-    getAll: async () => {
-        const response = await api.get<Property[]>('/properties');
+    getAll: async (params?: Record<string, any>) => {
+        const response = await api.get<Property[]>('/properties', { params });
         return response.data;
     },
     getMyListings: async () => {
@@ -66,12 +99,20 @@ export const propertyService = {
         const response = await api.delete(`/properties/${id}`);
         return response.data;
     },
+    toggleActive: async (id: string | number) => {
+        const response = await api.patch(`/properties/${id}/toggle-active`);
+        return response.data;
+    }
 };
 
 
 export const requirementService = {
-    getAll: async () => {
-        const response = await api.get<Requirement[]>('/requirements');
+    getAll: async (params?: any) => {
+        const response = await api.get<Requirement[]>('/requirements', { params });
+        return response.data;
+    },
+    getMyRequirements: async () => {
+        const response = await api.get<Requirement[]>('/requirements/me');
         return response.data;
     },
     getById: async (id: string | number) => {
@@ -82,73 +123,20 @@ export const requirementService = {
         const response = await api.post<Requirement>('/requirements', requirement);
         return response.data;
     },
+    update: async (id: string | number, requirement: Partial<Requirement>) => {
+        const response = await api.put<Requirement>(`/requirements/${id}`, requirement);
+        return response.data;
+    },
     delete: async (id: string) => {
         const response = await api.delete(`/requirements/${id}`);
         return response.data;
     },
-};
-
-export const inquiryService = {
-    create: async (inquiryData: any) => {
-        const response = await api.post('/inquiries', inquiryData);
-        return response.data;
-    },
-    getMyInquiries: async () => {
-        const response = await api.get('/inquiries/me');
-        return response.data;
-    },
-    getInquiryDetail: async (id: string) => {
-        const response = await api.get(`/inquiries/${id}`);
-        return response.data;
-    },
-    sendMessage: async (id: string, message: string) => {
-        const response = await api.post(`/inquiries/${id}/messages`, { message });
-        return response.data;
-    },
-    updateStatus: async (id: string, status: string) => {
-        const response = await api.patch(`/inquiries/${id}/status`, { status });
+    toggleActive: async (id: string | number) => {
+        const response = await api.patch(`/requirements/${id}/toggle-active`);
         return response.data;
     }
 };
 
-export const chatService = {
-    getThreads: async () => {
-        const response = await api.get('/chat/threads');
-        return response.data;
-    },
-    getThreadMessages: async (id: string | number, page: number = 1, limit: number = 50) => {
-        const response = await api.get(`/chat/threads/${id}?page=${page}&limit=${limit}`);
-        return response.data;
-    },
-    createThread: async (threadData: { target_user_id: number, property_id?: number, message: string }) => {
-        const response = await api.post('/chat/threads', threadData);
-        return response.data;
-    },
-    sendMessage: async (id: string | number, content: string) => {
-        const response = await api.post(`/chat/threads/${id}/messages`, { content });
-        return response.data;
-    },
-    markAsRead: async (id: string | number) => {
-        const response = await api.post(`/chat/threads/${id}/read`);
-        return response.data;
-    },
-    editMessage: async (messageId: string | number, content: string) => {
-        const response = await api.put(`/chat/messages/${messageId}`, { content });
-        return response.data;
-    },
-    deleteMessage: async (messageId: string | number) => {
-        const response = await api.delete(`/chat/messages/${messageId}`);
-        return response.data;
-    },
-    updateTypingStatus: async (threadId: string | number, isTyping: boolean) => {
-        const response = await api.post(`/chat/threads/${threadId}/typing`, { is_typing: isTyping });
-        return response.data;
-    },
-    searchMessages: async (query: string) => {
-        const response = await api.get(`/chat/search?q=${encodeURIComponent(query)}`);
-        return response.data;
-    }
-};
 
 export const notificationService = {
     getAll: async () => {
@@ -165,20 +153,6 @@ export const notificationService = {
     }
 };
 
-export const paymentService = {
-    getMyPayments: async () => {
-        const response = await api.get('/payments/me');
-        return response.data;
-    },
-    create: async (paymentData: any) => {
-        const response = await api.post('/payments', paymentData);
-        return response.data;
-    },
-    processListingPayment: async (paymentInfo: { property_id: number | string, amount: number, plan?: string }) => {
-        const response = await api.post('/payments/process', paymentInfo);
-        return response.data;
-    }
-};
 
 export const adminService = {
     getUsers: async () => {
@@ -201,16 +175,8 @@ export const adminService = {
         const response = await api.patch(`/admin/users/${id}/badge`, { badge });
         return response.data;
     },
-    sendMessage: async (id: number, content: string) => {
-        const response = await api.post(`/admin/users/${id}/message`, { content });
-        return response.data;
-    },
 
 
-    getPayments: async () => {
-        const response = await api.get('/admin/payments');
-        return response.data;
-    },
     getStats: async () => {
         const response = await api.get('/admin/stats');
         return response.data;
@@ -258,6 +224,25 @@ export const adminService = {
                 'Content-Type': 'multipart/form-data'
             }
         });
+        return response.data;
+    },
+    getPremiumRequests: async () => {
+        const response = await api.get('/admin/premium/requests');
+        return response.data;
+    },
+    updatePremiumRequest: async (id: number | string, status: string) => {
+        const response = await api.patch(`/admin/premium/requests/${id}`, { status });
+        return response.data;
+    },
+    toggleUserPremium: async (id: number | string, isPremium: boolean) => {
+        const response = await api.patch(`/admin/users/${id}/premium`, { is_premium: isPremium });
+        return response.data;
+    }
+};
+
+export const premiumService = {
+    requestPremium: async (message: string) => {
+        const response = await api.post('/premium/request', { message });
         return response.data;
     }
 };
@@ -325,7 +310,28 @@ export const authService = {
     logout: () => {
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        localStorage.removeItem('user');
+    }
+};
+
+export const advertisementService = {
+    getActiveAds: async (): Promise<Advertisement[]> => {
+        const response = await api.get<Advertisement[]>('/advertisements');
+        return response.data;
+    },
+    adminGetAds: async (): Promise<Advertisement[]> => {
+        const response = await api.get<Advertisement[]>('/admin/advertisements');
+        return response.data;
+    },
+    adminCreateAd: async (adData: Partial<Advertisement>): Promise<Advertisement> => {
+        const response = await api.post<Advertisement>('/admin/advertisements', adData);
+        return response.data;
+    },
+    adminUpdateAd: async (id: number | string, adData: Partial<Advertisement>): Promise<Advertisement> => {
+        const response = await api.put<Advertisement>(`/admin/advertisements/${id}`, adData);
+        return response.data;
+    },
+    adminDeleteAd: async (id: number | string): Promise<void> => {
+        await api.delete(`/admin/advertisements/${id}`);
     }
 };
 

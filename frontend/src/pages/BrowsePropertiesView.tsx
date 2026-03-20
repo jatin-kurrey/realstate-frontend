@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FilterBar from '@/components/FilterBar';
 import PropertyCard from '@/components/PropertyCard';
@@ -9,6 +9,7 @@ import { propertyService } from '@/services/api';
 import { Property } from '@/types/types';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface BrowsePropertiesViewProps {
   onNavigateToRequirements: () => void;
@@ -27,20 +28,7 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
   const [isLoggedIn] = useState(!!localStorage.getItem('token'));
   const [isAddPropertyModalOpen, setIsAddPropertyModalOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const data = await propertyService.getAll();
-        setProperties(data);
-        setFilteredProperties(data);
-      } catch (error) {
-        console.error('Failed to fetch properties:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProperties();
-  }, []);
+  // No initial fetch here; FilterBar will trigger handleSearch on mount
 
   const handleOpenDetail = (property: Property) => {
     navigate(`/properties/${property.id}`);
@@ -56,26 +44,41 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
 
   const handlePropertySuccess = () => {
     setLoading(true);
-    propertyService.getAll().then(data => {
+    propertyService.getAll({ premium_only: currentFilters.showPremium ? 'true' : 'false' }).then(data => {
       setProperties(data);
-      setFilteredProperties(data);
+      applyLocalFilters(data, currentFilters);
       setLoading(false);
     });
   };
 
-  const handleSearch = (filters: any) => {
-    let filtered = [...properties];
+  const { isPremium, userRole } = useAuth();
+  const hasPremiumAccess = isPremium || userRole === 'admin';
+
+  const [currentFilters, setCurrentFilters] = useState<any>({});
+  const threshold = Number(config.premium_price_threshold) || 30000000;
+
+  const isPremiumItem = useCallback((p: Property) => {
+    return p.is_premium || p.price >= threshold;
+  }, [threshold]);
+
+  const applyLocalFilters = useCallback((source: Property[], filters: any) => {
+    let filtered = [...source];
+
+    // ── PREMIUM TOGGLE LOGIC (Threshold-Synced) ──
+    if (filters.showPremium) {
+      // Toggle ON: Show ONLY premium properties
+      filtered = filtered.filter(p => isPremiumItem(p));
+    } else {
+      // Toggle OFF: Show ONLY standard properties
+      filtered = filtered.filter(p => !isPremiumItem(p));
+    }
 
     // Search Query
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
         p.title?.toLowerCase().includes(query) ||
-        p.location?.toLowerCase().includes(query) ||
-        p.street_name?.toLowerCase().includes(query) ||
-        p.village?.toLowerCase().includes(query) ||
-        p.land_use?.toLowerCase().includes(query) ||
-        (p.landmark && p.landmark.toLowerCase().includes(query))
+        p.location?.toLowerCase().includes(query)
       );
     }
 
@@ -89,43 +92,31 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
       filtered = filtered.filter(p => p.type === filters.type);
     }
 
-    // Location Hierarchy (Naive Check)
-    if (filters.district && !filters.district.includes('Select')) {
-      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.district.toLowerCase()));
-    }
-    if (filters.tehesil && !filters.tehesil.includes('Select')) {
-      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.tehesil.toLowerCase()));
-    }
-    if (filters.riCircle && !filters.riCircle.includes('Select')) {
-      filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.riCircle.toLowerCase()));
-    }
-    if (filters.village && !filters.village.includes('Select')) {
-      filtered = filtered.filter(p =>
-        (p.village && p.village.toLowerCase().includes(filters.village.toLowerCase())) ||
-        p.location.toLowerCase().includes(filters.village.toLowerCase())
-      );
-    }
-
-    // Area Range
-    const normalizeArea = (area: number, unit: string) => {
-      if (unit === 'acre') return area * 43560;
-      return area;
-    };
-
-    if (filters.minArea || filters.maxArea) {
-      const filterUnit = filters.areaUnit || 'sqft';
-      // If minArea/maxArea are strings, parse them.
-      const min = filters.minArea ? normalizeArea(parseFloat(filters.minArea), filterUnit) : 0;
-      const max = filters.maxArea ? normalizeArea(parseFloat(filters.maxArea), filterUnit) : Infinity;
-
-      filtered = filtered.filter(p => {
-        const pArea = normalizeArea(Number(p.area), p.area_unit || 'sqft');
-        return pArea >= min && pArea <= max;
-      });
-    }
-
     setFilteredProperties(filtered);
-  };
+  }, [isPremiumItem]);
+
+  const handleSearch = useCallback(async (filters: any) => {
+    // If premium filter changed, we MUST refetch from backend
+    // Or if currentFilters is empty (initial load)
+    const isInitialLoad = Object.keys(currentFilters).length === 0;
+    const premiumFilterChanged = filters.showPremium !== currentFilters.showPremium;
+
+    if (isInitialLoad || premiumFilterChanged) {
+      setLoading(true);
+      try {
+        const data = await propertyService.getAll({ premium_only: filters.showPremium ? 'true' : 'false' });
+        setProperties(data);
+        applyLocalFilters(data, filters);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      applyLocalFilters(properties, filters);
+    }
+    setCurrentFilters(filters);
+  }, [currentFilters, properties, applyLocalFilters]);
 
   return (
     <main className="bg-white">
@@ -142,13 +133,15 @@ const BrowsePropertiesView: React.FC<BrowsePropertiesViewProps> = ({
           </div>
 
           <div className="flex flex-col items-center justify-center pt-4 w-full">
-            <button
-              onClick={handlePostProperty}
-              className="bg-[#e2f2f0]/90 backdrop-blur-sm text-[#40a28f] px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-2xl shadow-black/10 hover:bg-white hover:scale-105 transition-all active:scale-[0.98] mb-8"
-            >
-              Post Your Property
-            </button>
-            <AdvertisementBanner />
+            {config['enable_listings'] === 'true' && (
+              <button
+                onClick={handlePostProperty}
+                className="bg-[#e2f2f0]/90 backdrop-blur-sm text-[#40a28f] px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-2xl shadow-black/10 hover:bg-white hover:scale-105 transition-all active:scale-[0.98] mb-8"
+              >
+                Post Your Property
+              </button>
+            )}
+            <AdvertisementBanner mode="property" />
           </div>
         </div>
 

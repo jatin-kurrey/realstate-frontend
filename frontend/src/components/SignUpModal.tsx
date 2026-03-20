@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { authService } from '@/services/api';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 interface SignUpModalProps {
   isOpen: boolean;
@@ -10,6 +11,9 @@ interface SignUpModalProps {
 }
 
 const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose, onSwitchToLogin }) => {
+  const { config } = useSiteConfig();
+  const showRoleSelection = config['registration_role_selection'] === 'true';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -44,8 +48,8 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose, onSwitchToLo
       />
 
       {/* Modal Content */}
-      <div className="relative bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="p-8 sm:p-10">
+      <div className="relative bg-white w-[95%] sm:w-full max-w-lg rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="p-5 sm:p-12">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
@@ -105,21 +109,23 @@ const SignUpModal: React.FC<SignUpModalProps> = ({ isOpen, onClose, onSwitchToLo
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">I am a</label>
-              <div className="relative">
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 cursor-pointer"
-                >
-                  <option value="seeker">Property Seeker (Buyer/Tenant)</option>
-                  <option value="owner">Property Owner / Agent</option>
-                  <option value="developer">Real Estate Developer</option>
-                </select>
-                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+            {showRoleSelection && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">I am a</label>
+                <div className="relative">
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full bg-gray-50/50 border border-gray-100 rounded-2xl py-3.5 px-5 appearance-none focus:outline-none focus:ring-4 focus:ring-[#40a28f]/5 focus:border-[#40a28f] transition-all text-sm font-bold text-gray-600 cursor-pointer"
+                  >
+                    <option value="seeker">Property Owner/ Seeker</option>
+                    <option value="broker">Real Estate Broker</option>
+                    <option value="developer">Real Estate Developer</option>
+                  </select>
+                  <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                </div>
               </div>
-            </div>
+            )}
 
             {role === 'developer' && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">

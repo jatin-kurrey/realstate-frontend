@@ -1,12 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { propertyService, bookmarkService } from '@/services/api';
+import { propertyService, bookmarkService, getImageUrl } from '@/services/api';
 import { Property } from '@/types/types';
 import {
     MapPin,
-    Ruler,
-    Maximize,
     Home,
     Tag,
     CheckCircle,
@@ -17,13 +15,46 @@ import {
     ShieldCheck,
     MessageCircle,
     Clock,
-    User
+    User,
+    Crown,
+    Calculator,
+    TrendingUp,
+    Landmark,
+    AlertTriangle
 } from 'lucide-react';
 import LoginModal from '@/components/LoginModal';
 import SignUpModal from '@/components/SignUpModal';
-import ContactModal from '@/components/ContactModal';
-import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
+import PremiumModal from '@/components/PremiumModal';
+
+// ─── SDV Guideline Rates (CG 2025-26) ────────────────────────────────────────
+const SDV_RATES: Record<string, number> = {
+    residential: 900,   // Nagar Nigam base (conservative)
+    commercial:  1600,
+    agricultural: 180,
+    industrial:   1200,
+    default:      900,
+};
+function getSDVEstimate(area: number, areaUnit: string, type: string) {
+    const toSqFt = (v: number, u: string) => {
+        if (u === 'acres') return v * 43560;
+        if (u === 'hectare') return v * 107639;
+        return v; // sqft
+    };
+    const sqFt = toSqFt(area, areaUnit || 'sqft');
+    const rateKey = (type || '').toLowerCase().includes('commercial') ? 'commercial'
+        : (type || '').toLowerCase().includes('agri') ? 'agricultural'
+        : 'residential';
+    const rate = SDV_RATES[rateKey] ?? SDV_RATES.default;
+    const landSDV   = sqFt * rate;
+    const stampMale = landSDV * 0.05;
+    const stampFemale = landSDV * 0.04;
+    const regFee    = landSDV * 0.04;
+    const totalMale = stampMale + regFee;
+    const totalFemale = stampFemale + regFee;
+    const loanLAP   = landSDV * 0.75;
+    return { landSDV, stampMale, stampFemale, regFee, totalMale, totalFemale, loanLAP, sqFt, rate };
+}
 
 const PropertyDetailsView: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -32,27 +63,18 @@ const PropertyDetailsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
-    const [showContactModal, setShowContactModal] = useState(false);
-    const { createThread } = useChat();
+    const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+
     const { isAuthenticated, openLogin } = useAuth();
 
     const handleContactDealer = async () => {
-        if (!isAuthenticated) {
-            openLogin();
+        if (!property || !property.owner) return;
+        const phone = property.owner.phone;
+        if (!phone) {
+            alert('Phone number not available for this owner.');
             return;
         }
-        if (!property || !property.owner_id) return;
-        setShowContactModal(true);
-    };
-
-    const handleSendMessage = async (message: string) => {
-        if (!property || !property.owner_id) return;
-        try {
-            const thread = await createThread(Number(property.owner_id), Number(property.id), message);
-            navigate(`/messages/${thread.id}`);
-        } catch (err) {
-            console.error("Failed to initiate contact", err);
-        }
+        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}`, '_blank');
     };
 
     useEffect(() => {
@@ -79,9 +101,14 @@ const PropertyDetailsView: React.FC = () => {
                         setIsBookmarked(list.some(p => p.id === Number(id))); // Assuming ID might be number map to string
                     }
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Failed to fetch property details:', err);
-                setError('Failed to load property details. Please try again later.');
+                if (err.response?.status === 403 || err.response?.data?.isPremium) {
+                    setIsPremiumModalOpen(true);
+                    setError('PREMIUM_CONTENT');
+                } else {
+                    setError('Failed to load property details. Please try again later.');
+                }
             } finally {
                 setLoading(false);
             }
@@ -147,6 +174,33 @@ const PropertyDetailsView: React.FC = () => {
         );
     }
 
+    if (error === 'PREMIUM_CONTENT') {
+        return (
+            <div className="min-h-screen bg-[#fcfdfd] flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-emerald-500/10">
+                    <Crown className="h-10 w-10 text-emerald-600" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-800 mb-2 uppercase tracking-tight">Premium Listing</h2>
+                <p className="text-gray-500 mb-8 max-w-sm font-medium">This is a high-value premium property. You need an active premium membership to view its details, documents, and owner contact.</p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                        onClick={() => setIsPremiumModalOpen(true)}
+                        className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                    >
+                        <Crown className="h-4 w-4" /> Upgrade to Premium
+                    </button>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all active:scale-95"
+                    >
+                        Keep Browsing
+                    </button>
+                </div>
+                <PremiumModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} />
+            </div>
+        );
+    }
+
     if (error || !property) {
         return (
             <div className="min-h-screen bg-[#fcfdfd] flex flex-col items-center justify-center p-4 text-center">
@@ -204,7 +258,7 @@ const PropertyDetailsView: React.FC = () => {
                         {/* Hero Image */}
                         <div className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl shadow-gray-200/50 group">
                             <img
-                                src={property.imageUrl}
+                                src={getImageUrl(property.imageUrl)}
                                 alt={property.title}
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                             />
@@ -226,32 +280,41 @@ const PropertyDetailsView: React.FC = () => {
                                         <ShieldCheck className="h-3 w-3" /> Verified
                                     </span>
                                 )}
+                                {property.is_premium && (
+                                    <span className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20 flex items-center gap-1">
+                                        Premium
+                                    </span>
+                                )}
                             </div>
                         </div>
 
                         {/* Title & Location Header */}
                         <div className="space-y-4">
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                <div className="space-y-2">
-                                    <h1 className="text-3xl md:text-4xl font-black text-gray-800 leading-tight">
+                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                                <div className="space-y-2 flex-grow min-w-0">
+                                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-gray-800 leading-tight break-words flex items-center gap-3">
                                         {property.title}
+                                        {property.is_premium && (
+                                            <Crown className="w-8 h-8 text-emerald-600 fill-current shrink-0" />
+                                        )}
                                     </h1>
                                     <div className="flex items-center gap-2 text-gray-500 font-medium text-lg">
-                                        <MapPin className="h-5 w-5 text-[#40a28f]" />
-                                        {(() => {
-                                            const mainLoc = property.street_name || property.landmark;
-                                            const locParts = [mainLoc, property.village].filter(Boolean);
-                                            return locParts.length > 0 ? locParts.join(', ') : property.location;
-                                        })()}
+                                        <MapPin className="h-5 w-5 text-[#40a28f] flex-shrink-0" />
+                                        <span className="break-words">
+                                            {(() => {
+                                                const mainLoc = property.street_name || property.landmark;
+                                                const locParts = [mainLoc, property.village].filter(Boolean);
+                                                return locParts.length > 0 ? locParts.join(', ') : property.location;
+                                            })()}
+                                        </span>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-col items-start md:items-end">
-                                    <div className="text-3xl md:text-4xl font-black text-[#40a28f] tracking-tight">
+                                <div className="flex flex-col items-start md:items-end flex-shrink-0">
+                                    <div className="text-3xl md:text-4xl lg:text-5xl font-black text-[#40a28f] tracking-tighter">
                                         ₹{property.price.toLocaleString()}
                                     </div>
                                     {property.status === 'Rent' && (
-                                        <span className="text-gray-400 font-bold uppercase tracking-wider text-xs">Per Month</span>
+                                        <span className="text-gray-400 font-bold uppercase tracking-widest text-[10px] md:text-xs">Per Month</span>
                                     )}
                                     {property.is_negotiable && (
                                         <span className="inline-block mt-2 px-3 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-green-100">
@@ -279,18 +342,18 @@ const PropertyDetailsView: React.FC = () => {
                                         <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider mb-1">Location</dt>
                                         <dd className="font-bold text-gray-800">
                                             {[
-                                                property.landmark,
-                                                property.street_name,
-                                                property.village,
-                                                property.revenue_inspector_circle && `RI: ${property.revenue_inspector_circle}`,
+                                                property.district && `Dist: ${property.district}`,
                                                 property.tehsil && `Tehsil: ${property.tehsil}`,
-                                                property.district && `Dist: ${property.district}`
-                                            ].filter(Boolean).join(' > ')}
+                                                property.revenue_inspector_circle && `RI: ${property.revenue_inspector_circle}`,
+                                                property.village,
+                                                property.street_name,
+                                                property.landmark
+                                            ].filter(Boolean).join(' › ')}
                                         </dd>
                                     </div>
                                     <div className="flex justify-between border-b border-gray-50 pb-2">
                                         <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Area</dt>
-                                        <dd className="font-bold text-gray-800">{property.area} {property.area_unit}</dd>
+                                        <dd className="font-bold text-gray-800">{property.area}<sup className="text-[10px]">2</sup> {property.area_unit === 'sqft' ? 'Sq Ft' : 'Acres'}</dd>
                                     </div>
                                     <div className="flex justify-between border-b border-gray-50 pb-2">
                                         <dt className="font-bold text-gray-400 text-sm uppercase tracking-wider">Dimensions</dt>
@@ -316,6 +379,65 @@ const PropertyDetailsView: React.FC = () => {
                                     </div>
                                 </dl>
                             </div>
+
+                            {/* ── SDV Estimate Card ── */}
+                            {property.area > 0 && (() => {
+                                const sdv = getSDVEstimate(property.area, property.area_unit, property.type);
+                                const fmtL = (n: number) => n >= 10000000
+                                    ? `₹${(n/10000000).toFixed(2)} Cr`
+                                    : n >= 100000 ? `₹${(n/100000).toFixed(2)} L`
+                                    : `₹${Math.round(n).toLocaleString('en-IN')}`;
+                                return (
+                                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-[#40a28f]/20 rounded-lg">
+                                                <Calculator className="h-4 w-4 text-[#40a28f]" />
+                                            </div>
+                                            <h4 className="text-[10px] font-black text-white uppercase tracking-[0.25em]">Estimated SDV & Stamp Duty</h4>
+                                        </div>
+                                        <span className="text-[9px] text-white/30 font-bold uppercase tracking-widest">CG 2025-26</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-white/5 rounded-xl p-3">
+                                            <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Land SDV</p>
+                                            <p className="text-lg font-black text-white mt-0.5">{fmtL(sdv.landSDV)}</p>
+                                            <p className="text-[9px] text-[#40a28f] font-bold">₹{sdv.rate}/sqft guideline</p>
+                                        </div>
+                                        <div className="bg-white/5 rounded-xl p-3">
+                                            <p className="text-[9px] text-white/40 font-black uppercase tracking-wider">Max Loan (LAP 75%)</p>
+                                            <p className="text-lg font-black text-white mt-0.5">{fmtL(sdv.loanLAP)}</p>
+                                            <p className="text-[9px] text-white/30 font-bold">Loan Against Property</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-white/5 pt-4 grid grid-cols-3 gap-2">
+                                        {[
+                                            { label: 'Stamp (Male 5%)', val: fmtL(sdv.stampMale) },
+                                            { label: 'Stamp (Female 4%)', val: fmtL(sdv.stampFemale) },
+                                            { label: 'Reg Fee (4%)', val: fmtL(sdv.regFee) },
+                                        ].map((item, i) => (
+                                            <div key={i} className="text-center">
+                                                <p className="text-[8px] text-white/30 font-black uppercase tracking-wider">{item.label}</p>
+                                                <p className="text-sm font-black text-orange-400 mt-0.5">{item.val}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                                        <AlertTriangle className="h-3 w-3 text-amber-400 flex-shrink-0" />
+                                        <p className="text-[9px] text-amber-400/80 font-medium">
+                                            Estimate based on Nagar Nigam base rate. Use the{' '}
+                                            <button onClick={() => navigate('/sdv-calculator')}
+                                                className="underline text-amber-400 font-black hover:text-amber-300 transition-colors">
+                                                SDV Calculator
+                                            </button>{' '}for exact zone-specific values.
+                                        </p>
+                                    </div>
+                                </div>
+                                );
+                            })()}
 
                             {property.google_map_url && (
                                 <div>
@@ -367,10 +489,10 @@ const PropertyDetailsView: React.FC = () => {
                             <div className="space-y-3">
                                 <button
                                     onClick={handleContactDealer}
-                                    className="w-full py-5 bg-[#40a28f] hover:bg-[#358a7a] text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#40a28f]/20 active:scale-[0.98]"
+                                    className="w-full py-5 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#25D366]/20 active:scale-[0.98]"
                                 >
                                     <MessageCircle className="h-5 w-5" />
-                                    Contact Dealer (In-App)
+                                    Contact Dealer (WhatsApp)
                                 </button>
                                 <button
                                     onClick={() => isAuthenticated ? handleToggleBookmark() : openLogin()}
@@ -390,16 +512,6 @@ const PropertyDetailsView: React.FC = () => {
                 </div>
             </main>
 
-            {/* Contact Modal */}
-            <ContactModal
-                isOpen={showContactModal}
-                onClose={() => setShowContactModal(false)}
-                recipientName={property.owner?.role === 'developer' && property.owner.company_name
-                    ? property.owner.company_name
-                    : property.owner?.name || "Property Owner"}
-                propertyName={property.title}
-                onSend={handleSendMessage}
-            />
         </div>
     );
 };

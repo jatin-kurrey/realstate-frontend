@@ -71,8 +71,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
       />
 
       {/* Modal Content */}
-      <div className="relative bg-white w-full max-w-lg rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-        <div className="p-6 sm:p-12">
+      <div className="relative bg-white w-[95%] sm:w-full max-w-lg rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div className="p-5 sm:p-12">
           {/* Header */}
           <div className="flex items-center justify-between mb-6 sm:mb-8">
             <h2 className="text-xl sm:text-2xl font-bold text-[#2d3748]">Welcome Back</h2>
@@ -145,7 +145,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSwitchToSign
                 theme="outline"
                 shape="pill"
                 size="large"
-                width="100%"
+                width="320"
                 containerProps={{
                   className: "!py-2 sm:!py-2.5 !px-4 !rounded-md !text-sm sm:!text-base"
                 }}

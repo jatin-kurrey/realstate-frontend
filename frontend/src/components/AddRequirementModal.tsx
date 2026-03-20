@@ -1,32 +1,96 @@
 import React, { useState } from 'react';
 import { X, Loader2, ChevronRight, ChevronLeft, MapPin, IndianRupee, Home, ClipboardList, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { requirementService } from '../services/api';
+import { Requirement } from '../types/types';
 
 interface AddRequirementModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    requirement?: Requirement | null;
+    defaultPurpose?: string;
 }
 
-const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClose, onSuccess, requirement, defaultPurpose }) => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSuccess, setIsSuccess] = useState(false);
 
     const [formData, setFormData] = useState({
-        purpose: 'Buy',
-        type: 'Residential',
-        minBudget: '',
-        maxBudget: '',
-        location: '',
-        minArea: '',
-        maxArea: '',
-        description: '',
-        contactMethod: 'In-app Messaging',
-        contact_name: '',
-        contact_phone: '',
+        purpose: requirement?.purpose || defaultPurpose || 'Buy',
+        type: requirement?.type || 'Residential',
+        minBudget: requirement?.minBudget?.toString() || '',
+        maxBudget: requirement?.maxBudget?.toString() || '',
+        location: requirement?.location || '',
+        street_name: requirement?.street_name || '',
+        village: requirement?.village || '',
+        revenue_inspector_circle: requirement?.revenue_inspector_circle || '',
+        tehsil: requirement?.tehsil || '',
+        district: requirement?.district || '',
+        landmark: requirement?.landmark || '',
+        land_use: requirement?.land_use || 'Residential',
+        minArea: requirement?.minArea?.toString() || '',
+        maxArea: requirement?.maxArea?.toString() || '',
+        area_unit: requirement?.area_unit || 'sqft',
+        expected_rate: requirement?.expected_rate || '',
+        description: requirement?.description || '',
+        contactMethod: requirement?.contactMethod || 'In-app Messaging',
+        contact_name: requirement?.contact_name || '',
+        contact_phone: requirement?.contact_phone || '',
     });
+
+    // Reset form when requirement or open state changes
+    React.useEffect(() => {
+        if (requirement) {
+            setFormData({
+                purpose: requirement.purpose,
+                type: requirement.type,
+                minBudget: requirement.minBudget.toString(),
+                maxBudget: requirement.maxBudget.toString(),
+                location: requirement.location,
+                street_name: requirement.street_name || '',
+                village: requirement.village || '',
+                revenue_inspector_circle: requirement.revenue_inspector_circle || '',
+                tehsil: requirement.tehsil || '',
+                district: requirement.district || '',
+                landmark: requirement.landmark || '',
+                land_use: requirement.land_use || 'Residential',
+                minArea: requirement.minArea.toString(),
+                maxArea: requirement.maxArea.toString(),
+                area_unit: requirement.area_unit,
+                expected_rate: requirement.expected_rate || '',
+                description: requirement.description,
+                contactMethod: requirement.contactMethod,
+                contact_name: requirement.contact_name || '',
+                contact_phone: requirement.contact_phone || '',
+            });
+        } else if (isOpen) {
+            setFormData({
+                purpose: defaultPurpose || 'Buy',
+                type: 'Residential',
+                minBudget: '',
+                maxBudget: '',
+                location: '',
+                street_name: '',
+                village: '',
+                revenue_inspector_circle: '',
+                tehsil: '',
+                district: '',
+                landmark: '',
+                land_use: 'Residential',
+                minArea: '',
+                maxArea: '',
+                area_unit: 'sqft',
+                expected_rate: '',
+                description: '',
+                contactMethod: 'In-app Messaging',
+                contact_name: '',
+                contact_phone: '',
+            });
+            setStep(1);
+        }
+    }, [requirement, isOpen, defaultPurpose]);
 
     if (!isOpen) return null;
 
@@ -34,7 +98,7 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
         // Simple validation
         if (step === 1 && (!formData.purpose || !formData.type)) return;
         if (step === 2 && (!formData.minBudget || !formData.maxBudget)) return;
-        if (step === 3 && !formData.location) return;
+        if (step === 3 && !formData.village) return;
 
         setStep(prev => Math.min(prev + 1, 4));
     };
@@ -51,41 +115,68 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
         setError(null);
 
         try {
-            await requirementService.create({
+            const data = {
                 purpose: formData.purpose as any,
                 type: formData.type as any,
                 minBudget: Number(formData.minBudget),
                 maxBudget: Number(formData.maxBudget),
-                location: formData.location,
+                location: `${formData.village}${formData.tehsil ? ', ' + formData.tehsil : ''}${formData.district ? ', ' + formData.district : ''}`,
+                street_name: formData.street_name,
+                village: formData.village,
+                revenue_inspector_circle: formData.revenue_inspector_circle,
+                tehsil: formData.tehsil,
+                district: formData.district,
+                landmark: formData.landmark,
+                land_use: formData.land_use,
                 minArea: Number(formData.minArea),
                 maxArea: Number(formData.maxArea),
+                area_unit: formData.area_unit,
+                expected_rate: formData.expected_rate,
                 description: formData.description,
                 contactMethod: formData.contactMethod,
                 contact_name: formData.contact_name,
                 contact_phone: formData.contact_phone,
-            });
+            };
+
+            if (requirement) {
+                await requirementService.update(requirement.id, data);
+            } else {
+                await requirementService.create(data);
+            }
+            
             setIsSuccess(true);
             if (onSuccess) onSuccess();
             setTimeout(() => {
                 onClose();
                 setStep(1);
                 setIsSuccess(false);
-                setFormData({
-                    purpose: 'Buy',
-                    type: 'Residential',
-                    minBudget: '',
-                    maxBudget: '',
-                    location: '',
-                    minArea: '',
-                    maxArea: '',
-                    description: '',
-                    contactMethod: 'In-app Messaging',
-                    contact_name: '',
-                    contact_phone: '',
-                });
+                if (!requirement) {
+                    setFormData({
+                        purpose: 'Buy',
+                        type: 'Residential',
+                        minBudget: '',
+                        maxBudget: '',
+                        location: '',
+                        street_name: '',
+                        village: '',
+                        revenue_inspector_circle: '',
+                        tehsil: '',
+                        district: '',
+                        landmark: '',
+                        land_use: 'Residential',
+                        minArea: '',
+                        maxArea: '',
+                        area_unit: 'sqft',
+                        expected_rate: '',
+                        description: '',
+                        contactMethod: 'In-app Messaging',
+                        contact_name: '',
+                        contact_phone: '',
+                    });
+                }
             }, 2000);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to post requirement');
+            setError(err.response?.data?.error || 'Failed to process requirement');
         } finally {
             setLoading(false);
         }
@@ -121,11 +212,11 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">What is your goal?</label>
                                 <div className="grid grid-cols-2 gap-4">
-                                    {['Buy', 'Rent'].map(p => (
+                                    {['Buy', 'Rent', 'Mortgage'].map(p => (
                                         <button
                                             key={p}
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, purpose: p })}
+                                            onClick={() => setFormData({ ...formData, purpose: p as any })}
                                             className={`p-5 rounded-[24px] border-2 transition-all flex items-center justify-between group ${formData.purpose === p ? 'bg-[#e2f2f0] border-[#40a28f] text-[#40a28f]' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}
                                         >
                                             <span className="text-xs font-black uppercase tracking-widest">{p} Protocol</span>
@@ -138,19 +229,36 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Property Category</label>
                                 <div className="grid grid-cols-3 gap-3">
-                                    {['Residential', 'Commercial', 'Land'].map(t => (
+                                    {['Residential', 'Commercial', 'Plots'].map(t => (
                                         <button
                                             key={t}
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, type: t })}
+                                            onClick={() => setFormData({ ...formData, type: t as any })}
                                             className={`p-5 rounded-[24px] border-2 transition-all flex flex-col items-center gap-3 ${formData.type === t ? 'bg-[#e2f2f0] border-[#40a28f] text-[#40a28f]' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}
                                         >
                                             <div className={`p-2 rounded-xl ${formData.type === t ? 'bg-[#40a28f] text-white' : 'bg-gray-50'}`}>
                                                 <Home className="h-5 w-5" />
                                             </div>
-                                            <span className="text-[9px] font-black uppercase tracking-tight">{t}</span>
+                                            <span className="text-[9px] font-black uppercase tracking-tight">{t === 'Plots' ? 'Plot / Open Land' : t}</span>
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Land Use Preference</label>
+                                <div className="relative">
+                                    <select
+                                        value={formData.land_use}
+                                        onChange={(e) => setFormData({ ...formData, land_use: e.target.value })}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 cursor-pointer shadow-sm"
+                                    >
+                                        <option value="Residential">Residential</option>
+                                        <option value="Commercial">Commercial</option>
+                                        <option value="Commercial Cum Residential">Commercial Cum Residential</option>
+                                        <option value="Agriculture">Agriculture</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300 pointer-events-none" />
                                 </div>
                             </div>
                         </div>
@@ -160,8 +268,10 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                 return (
                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                         <div className="space-y-6">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Budget Range (₹)</label>
+                            <div className="space-y-4">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    {formData.purpose === 'Mortgage' ? 'Loan Amount Preferred (₹)' : 'Budget Range (₹)'}
+                                </label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative group">
                                         <div className="absolute left-5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</div>
@@ -184,9 +294,23 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                                         />
                                     </div>
                                 </div>
+                                
+                                {formData.purpose === 'Mortgage' && (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Expected Interest Rate (%)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 10% - 12%"
+                                            value={formData.expected_rate}
+                                            onChange={(e) => setFormData({ ...formData, expected_rate: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100/50 flex gap-3">
                                     <IndianRupee className="h-4 w-4 text-orange-400 shrink-0" />
-                                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-relaxed">Ensure your budget aligns with current market rates in Rajnandgaon for best results.</p>
+                                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-relaxed">Ensure your {formData.purpose === 'Mortgage' ? 'request' : 'budget'} aligns with current market rates in Rajnandgaon for best results.</p>
                                 </div>
                             </div>
                         </div>
@@ -196,22 +320,51 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                 return (
                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
                         <div className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Localities / Areas</label>
-                                <div className="relative group">
-                                    <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300 group-focus-within:text-[#40a28f] transition-colors" />
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Sadar Bazaar, Civil Lines, Motipur"
-                                        value={formData.location}
-                                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                        className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 pl-14 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm"
-                                    />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Street Name</label>
+                                        <input type="text" placeholder="Street Name" value={formData.street_name}
+                                            onChange={(e) => setFormData({ ...formData, street_name: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village/Locality</label>
+                                        <input type="text" placeholder="Village" value={formData.village}
+                                            onChange={(e) => setFormData({ ...formData, village: e.target.value, location: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" required />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RI Circle</label>
+                                        <input type="text" placeholder="RI Circle" value={formData.revenue_inspector_circle}
+                                            onChange={(e) => setFormData({ ...formData, revenue_inspector_circle: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tehsil</label>
+                                        <input type="text" placeholder="Tehsil" value={formData.tehsil}
+                                            onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">District</label>
+                                        <input type="text" placeholder="District" value={formData.district}
+                                            onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                                            className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-4 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Landmark</label>
+                                    <input type="text" placeholder="Landmark" value={formData.landmark}
+                                        onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-3.5 px-5 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 shadow-sm" />
                                 </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Required Size (Sq Ft)</label>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <input
                                         type="number"
                                         placeholder="Min Area"
@@ -226,6 +379,14 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                                         onChange={(e) => setFormData({ ...formData, maxArea: e.target.value })}
                                         className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-6 focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 transition-all shadow-sm"
                                     />
+                                    <select
+                                        value={formData.area_unit}
+                                        onChange={(e) => setFormData({ ...formData, area_unit: e.target.value as any })}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-[20px] py-4 px-4 appearance-none focus:outline-none focus:ring-8 focus:ring-[#40a28f]/5 focus:border-[#40a28f] text-sm font-bold text-gray-600 cursor-pointer shadow-sm"
+                                    >
+                                        <option value="sqft">Sq foot</option>
+                                        <option value="acre">Acers</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -297,66 +458,69 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
-
-            <div className="relative bg-white rounded-[48px] w-full max-w-2xl overflow-hidden shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] flex flex-col max-h-[90vh]">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
+            <div className="relative bg-white w-[95%] sm:w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="p-10 pb-6">
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <span className="text-[10px] font-black text-[#40a28f] uppercase tracking-[0.3em] block mb-1">RJG Property Network</span>
-                            <h2 className="text-3xl font-black text-gray-800 tracking-tight uppercase">Post Requirement</h2>
-                        </div>
-                        <button onClick={onClose} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-[20px] transition-all group">
-                            <X className="h-6 w-6 text-gray-400 group-hover:rotate-90 transition-transform" />
-                        </button>
+                <div className="p-4 sm:p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                    <div className="space-y-1">
+                        <h2 className="text-lg sm:text-xl font-black text-gray-800 tracking-tight uppercase">
+                            Post Requirement
+                        </h2>
+                        <p className="text-[9px] sm:text-[10px] font-bold text-[#40a28f] uppercase tracking-widest">
+                            Post what you are looking for
+                        </p>
                     </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-2xl transition-all">
+                        <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
+                    </button>
+                </div>
 
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-5 sm:p-8 custom-scrollbar">
                     {/* Step Breadcrumbs */}
                     {!isSuccess && (
-                        <div className="flex items-center justify-center gap-4 text-[11px] font-black uppercase tracking-widest pb-4">
+                        <div className="flex items-center justify-center gap-4 text-[9px] sm:text-[11px] font-black uppercase tracking-widest pb-6 sm:pb-8">
                             {steps.map((s, idx) => (
                                 <React.Fragment key={s.id}>
-                                    <div className={`flex items-center gap-2 transition-all ${step === s.id ? 'text-[#40a28f] scale-105' : step > s.id ? 'text-gray-800' : 'text-gray-200'}`}>
-                                        <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[9px] ${step === s.id ? 'bg-[#40a28f] text-white' : step > s.id ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                    <div className={`flex items-center gap-1.5 transition-all ${step === s.id ? 'text-[#40a28f] scale-105' : step > s.id ? 'text-gray-800' : 'text-gray-200'}`}>
+                                        <span className={`w-4 h-4 sm:w-5 sm:h-5 rounded-lg flex items-center justify-center text-[8px] sm:text-[9px] ${step === s.id ? 'bg-[#40a28f] text-white' : step > s.id ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                             {s.id}
                                         </span>
-                                        {s.label}
+                                        <span className="hidden sm:inline">{s.label}</span>
                                     </div>
                                     {idx < steps.length - 1 && <ChevronRight className="h-3 w-3 text-gray-200" />}
                                 </React.Fragment>
                             ))}
                         </div>
                     )}
-                </div>
 
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto px-10 pb-10">
                     {error && (
-                        <div className="bg-red-50 text-red-500 p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center mb-8 border border-red-100 shadow-sm animate-bounce">
+                        <div className="bg-red-50 text-red-500 p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center mb-8 border border-red-100 shadow-sm">
                             {error}
                         </div>
                     )}
+
                     {renderStep()}
                 </div>
 
                 {/* Footer */}
-                <div className="p-10 pt-6 border-t border-gray-50 flex items-center justify-between bg-gray-50/50">
+                <div className="p-5 sm:p-8 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between sticky bottom-0">
                     {!isSuccess ? (
                         <>
                             <button
                                 type="button"
                                 onClick={prevStep}
-                                className={`flex items-center gap-2 px-8 py-4 rounded-[20px] font-black uppercase tracking-widest text-[10px] transition-all ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-gray-400 hover:bg-white hover:text-gray-600 shadow-sm'}`}
+                                className={`flex items-center gap-2 px-4 sm:px-8 py-3 rounded-xl sm:rounded-[20px] font-black uppercase tracking-widest text-[9px] sm:text-[10px] transition-all ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-gray-400 hover:bg-white hover:text-gray-600 shadow-sm'}`}
                             >
                                 <ChevronLeft className="h-4 w-4" />
-                                Previous Step
+                                <span className="hidden sm:inline">Previous Step</span>
+                                <span className="sm:hidden">Back</span>
                             </button>
 
                             {step < 4 ? (
                                 <button
                                     onClick={nextStep}
-                                    className="bg-[#40a28f] text-white px-10 py-4 rounded-[20px] font-black uppercase tracking-widest text-[10px] flex items-center gap-3 hover:bg-[#358a7a] transition-all shadow-xl shadow-[#40a28f]/20 active:scale-95 group"
+                                    className="bg-[#40a28f] text-white px-6 sm:px-10 py-3 rounded-xl sm:rounded-[20px] font-black uppercase tracking-widest text-[9px] sm:text-[10px] flex items-center gap-3 hover:bg-[#358a7a] transition-all shadow-xl shadow-[#40a28f]/20 active:scale-95 group"
                                 >
                                     Proceed Next
                                     <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -365,11 +529,11 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading}
-                                    className="bg-gray-800 text-white px-12 py-4 rounded-[20px] font-black uppercase tracking-widest text-[10px] flex items-center gap-3 hover:bg-black transition-all shadow-xl shadow-black/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="bg-gray-800 text-white px-8 sm:px-12 py-3 rounded-xl sm:rounded-[20px] font-black uppercase tracking-widest text-[9px] sm:text-[10px] flex items-center gap-3 hover:bg-black transition-all shadow-xl shadow-black/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                                         <>
-                                            Submit Requirement
+                                            Submit
                                             <ClipboardList className="h-4 w-4" />
                                         </>
                                     )}
@@ -386,6 +550,12 @@ const AddRequirementModal: React.FC<AddRequirementModalProps> = ({ isOpen, onClo
                     )}
                 </div>
             </div>
+
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2f2f0; border-radius: 10px; }
+            `}</style>
         </div>
     );
 };

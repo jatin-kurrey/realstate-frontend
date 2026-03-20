@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Info, ChevronDown, Loader2 } from 'lucide-react';
 import AddPropertyModal from '@/components/AddPropertyModal';
 import PropertyCard from '@/components/PropertyCard';
-import { propertyService, paymentService } from '@/services/api';
+import { propertyService } from '@/services/api';
 import { Property } from '@/types/types';
 import ActivateListingModal from '@/components/ActivateListingModal';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -42,20 +42,13 @@ const MyListingsView: React.FC = () => {
     setIsAddModalOpen(false);
     setSelectedProperty(null);
   };
-  const handleActivate = async () => {
+    const handleActivate = async () => {
     if (!selectedProperty) return;
     try {
-      await paymentService.processListingPayment({
-        property_id: selectedProperty.id as number,
-        amount: 100,
-        plan: '30 Days Activation'
-      });
+      // Payment removed - directly activate in the future or keep disabled
+      alert('Payment feature removed. Please contact admin for activation.');
       setIsActivateModalOpen(false);
-      fetchMyProperties();
-    } catch (error) {
-      console.error('Activation failed:', error);
-      alert('Failed to activate listing. Please try again.');
-    }
+    } catch (error) { console.error(error); }
   };
 
   useEffect(() => {

@@ -2,6 +2,7 @@
 import React from 'react';
 import { X, MapPin } from 'lucide-react';
 import { Property } from '@/types/types';
+import { getImageUrl } from '@/services/api';
 
 interface PropertyDetailModalProps {
   property: Property;
@@ -53,7 +54,7 @@ const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* Large Image */}
           <div className="w-full h-72 rounded-xl overflow-hidden mb-8 shadow-sm">
             <img
-              src={property.imageUrl}
+              src={getImageUrl(property.imageUrl)}
               alt={property.title}
               className="w-full h-full object-cover"
             />
