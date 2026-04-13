@@ -20,6 +20,7 @@ import AuctionPropertiesView from './pages/AuctionPropertiesView';
 import SDVCalculatorView from './pages/SDVCalculatorView';
 import MortgageView from './pages/MortgageView';
 import MortgageCalculatorView from './pages/MortgageCalculatorView';
+import MapView from './pages/MapView';
 import { useAuth } from './contexts/AuthContext';
 import LoginModal from './components/LoginModal';
 import SignUpModal from './components/SignUpModal';
@@ -65,6 +66,7 @@ const App: React.FC = () => {
                 location.pathname === '/sdv-calculator' ? 'SDV' :
                 location.pathname === '/mortgage' ? 'Mortgage' :
                 location.pathname === '/mortgage-calculator' ? 'Mortgage Calculator' :
+                location.pathname === '/map' ? 'Map' :
                 location.pathname === '/contact' ? 'About' : 'Browse';
 
   const handleAdminLogin = async (email: string, password: string) => {
@@ -113,6 +115,7 @@ const App: React.FC = () => {
       case 'SDV': navigate('/sdv-calculator'); break;
       case 'Mortgage': navigate('/mortgage'); break;
       case 'Mortgage Calculator': navigate('/mortgage-calculator'); break;
+      case 'Map': navigate('/map'); break;
       case 'Admin': navigate('/admin'); break;
       default: navigate('/');
     }
@@ -204,6 +207,7 @@ const App: React.FC = () => {
           <Route path="/sdv-calculator" element={<SDVCalculatorView />} />
           <Route path="/mortgage" element={<MortgageView />} />
           <Route path="/mortgage-calculator" element={<MortgageCalculatorView />} />
+          <Route path="/map" element={<MapView onNavigateToRequirements={() => navigate('/requirements')} />} />
           <Route
             path="/admin/*"
             element={

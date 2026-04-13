@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Property, Requirement, Advertisement, LocationMetadata } from '../types/types';
+import { Property, Requirement, Advertisement, LocationMetadata, MapProperty, MapRequirement, NearbyListingsResponse } from '../types/types';
 
 export const locationService = {
     getAll: async (params?: { type?: string; parent_id?: number | string }) => {
@@ -354,6 +354,23 @@ export const advertisementService = {
     },
     adminDeleteAd: async (id: number | string): Promise<void> => {
         await api.delete(`/admin/advertisements/${id}`);
+    }
+};
+
+export const mapService = {
+    getProperties: async (params?: { district?: string; tehsil?: string; type?: string; status?: string }): Promise<MapProperty[]> => {
+        const response = await api.get<MapProperty[]>('/map/properties', { params });
+        return response.data;
+    },
+    getRequirements: async (params?: { district?: string; tehsil?: string; type?: string; purpose?: string }): Promise<MapRequirement[]> => {
+        const response = await api.get<MapRequirement[]>('/map/requirements', { params });
+        return response.data;
+    },
+    getNearbyListings: async (lat: number, lng: number, radius: number = 10): Promise<NearbyListingsResponse> => {
+        const response = await api.get<NearbyListingsResponse>('/map/nearby', {
+            params: { lat, lng, radius }
+        });
+        return response.data;
     }
 };
 

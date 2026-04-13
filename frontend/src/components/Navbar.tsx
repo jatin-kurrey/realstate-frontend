@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LogOut, Menu, X, Map as MapIcon, ChevronDown, LayoutDashboard, ShieldCheck, Info, Crown, Star } from 'lucide-react';
+import { LogOut, Menu, X, Map as MapIcon, ChevronDown, LayoutDashboard, ShieldCheck, Info, Crown, Star, MapPin } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useSiteConfig } from '../contexts/SiteConfigContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,6 +64,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onOpenLogin,
   const mainNavItems = [
     { label: 'Properties', value: 'Browse', show: config['enable_properties'] !== 'false' },
     { label: 'Requirements', value: 'Requirements', show: config['enable_requirements'] !== 'false' },
+    { label: 'Map', value: 'Map', show: config['enable_map'] !== 'false' },
     { label: 'About', value: 'About', show: config['enable_about'] !== 'false' },
   ];
 
@@ -81,19 +82,19 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onOpenLogin,
   ];
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="flex justify-between h-20 items-center">
+    <nav className="bg-white/70 backdrop-blur-xl border-b border-gray-100/30 sticky top-0 z-50 font-['Outfit'] shadow-[0_4px_20px_-1px_rgba(0,0,0,0.02)]">
+      <div className="max-w-[1600px] mx-auto px-6 md:px-10">
+        <div className="flex justify-between h-24 items-center">
           {/* Logo Section */}
           <button
             onClick={() => onViewChange('Browse')}
-            className="flex items-center gap-3 hover:opacity-90 transition-all outline-none group"
+            className="flex items-center gap-4 hover:opacity-90 transition-all outline-none group"
           >
-            <div className="w-10 h-10 bg-[#40a28f] rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 shadow-lg shadow-[#40a28f]/20">
-              <MapIcon className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 bg-gradient-to-br from-[#40a28f] to-[#348e7c] rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:rotate-6 shadow-2xl shadow-[#40a28f]/30">
+              <MapIcon className="w-7 h-7 text-white" />
             </div>
-            <div className="flex flex-col items-start">
-              <span className="text-xl font-black text-[#40a28f] tracking-tighter leading-none uppercase">
+            <div className="flex flex-col items-start pt-1">
+              <span className="text-2xl font-black text-[#40a28f] tracking-tighter leading-none uppercase">
                 {config['site_name']?.split(' ')[0] || 'RJG'}
               </span>
               {config['enable_navbar_tagline'] !== 'false' && (
@@ -110,12 +111,15 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onOpenLogin,
               <button
                 key={item.value}
                 onClick={() => onViewChange(item.value)}
-                className={`text-[11px] font-black uppercase tracking-widest transition-all outline-none ${
-                  currentView === item.value ? 'text-[#40a28f]' : 'text-gray-500 hover:text-[#40a28f]'
-                }`}
-              >
-                {item.label}
-              </button>
+                className={`text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-2 group outline-none ${
+                   currentView === item.value ? 'text-[#40a28f]' : 'text-gray-400 hover:text-gray-900'
+                 }`}
+               >
+                 {item.label}
+                 <span className={`absolute bottom-0 left-0 h-0.5 bg-[#40a28f] transition-all duration-500 rounded-full ${
+                   currentView === item.value ? 'w-full' : 'w-0 group-hover:w-full'
+                 }`} />
+               </button>
             ))}
 
             {/* Layout Toggle: Dropdown vs Flat */}

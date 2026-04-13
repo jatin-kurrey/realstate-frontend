@@ -111,3 +111,44 @@ export interface LocationMetadata {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface MapProperty {
+  id: number;
+  unique_id: string;
+  title: string;
+  price: number;
+  location: string;
+  district: string;
+  tehsil: string;
+  latitude: number;
+  longitude: number;
+  type: PropertyType;
+  status: PropertyStatus;
+  image_url: string;
+  is_verified: boolean;
+  is_premium: boolean;
+}
+
+export interface MapRequirement {
+  id: number;
+  unique_id: string;
+  purpose: 'Buy' | 'Rent' | 'Mortgage';
+  type: PropertyType;
+  location: string;
+  district: string;
+  tehsil: string;
+  min_budget: number;
+  max_budget: number;
+  min_area: number;
+  max_area: number;
+  latitude: number;
+  longitude: number;
+  is_verified: boolean;
+  is_premium: boolean;
+}
+
+export interface NearbyListingsResponse {
+  properties: MapProperty[];
+  requirements: MapRequirement[];
+  count: number;
+}
